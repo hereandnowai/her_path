@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { useLanguage } from '../../contexts/LanguageContext';
-// import { useTheme } from '../../contexts/ThemeContext.tsx'; // useTheme import removed
 import { Language } from '../../types';
 import Button from '../../components/common/Button';
 import Card from '../../components/common/Card';
@@ -8,7 +7,6 @@ import SectionTitle from '../../components/common/SectionTitle';
 
 const SettingsScreen: React.FC = () => {
   const { language, setLanguage, translate } = useLanguage();
-  // const { theme, setTheme } = useTheme(); // theme state and functions removed
   const [notificationsEnabled, setNotificationsEnabled] = useState(
     localStorage.getItem('herPathNotifications') === 'true'
   );
@@ -41,8 +39,6 @@ const SettingsScreen: React.FC = () => {
         </select>
       </Card>
 
-      {/* App Theme Card Removed */}
-
       <Card className="mb-8">
         <h3 className="text-xl font-semibold text-gray-700 mb-4">{translate('notifications')}</h3>
         <div className="flex items-center justify-between">
@@ -65,13 +61,6 @@ const SettingsScreen: React.FC = () => {
         {!notificationsEnabled && <p className="text-sm text-gray-500 mt-2">You might miss important updates.</p> }
       </Card>
 
-      {/* Voice Navigation Card Removed as it's "coming soon"
-       <Card>
-        <h3 className="text-xl font-semibold text-gray-700 mb-4">Voice Navigation (Beta)</h3>
-        <p className="text-gray-600 mb-2">Enable voice commands to navigate the app. (Feature coming soon)</p>
-        <Button variant="secondary" disabled>Enable Voice Navigation</Button>
-      </Card>
-      */}
     </div>
   );
 };

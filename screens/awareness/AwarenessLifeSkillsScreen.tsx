@@ -1,238 +1,247 @@
 
-import React from 'react';
+
+import React, { useState, useCallback, useRef } from 'react';
+import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import SectionTitle from '../../components/common/SectionTitle';
 import Card from '../../components/common/Card';
-import Button from '../../components/common/Button';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { APP_NAME } from '../../constants';
+import { Language } from '../../types';
+import { usePdfDownloader } from '../../hooks/usePdfDownloader.ts';
+import DownloadButton from '../../components/common/DownloadButton.tsx';
+
 
 interface TopicItem {
   id: string;
   title: string;
   icon: string;
   description: string;
-  sections: Array<{
-    title: string;
-    type: 'list' | 'buttons' | 'mixed';
-    items: Array<{
-      text: string;
-      icon?: string;
-      disabled?: boolean;
-      isLink?: boolean;
-      note?: string;
-    }>;
-  }>;
+}
+
+interface ParsedContent {
+  introduction: string;
+  dos: string[];
+  donts: string[];
+  firstStep: string;
+  quote: string;
 }
 
 const AwarenessLifeSkillsScreen: React.FC = () => {
-  const { translate } = useLanguage();
+  const { translate, language } = useLanguage();
+  const [expandedTopicId, setExpandedTopicId] = useState<string | null>(null);
+  const [topicContent, setTopicContent] = useState<{ [key: string]: { loading: boolean; error: string | null; content: ParsedContent | null } }>({});
+
+  const contentRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
+  const { downloadPdf, isDownloading } = usePdfDownloader();
+
+  const apiKey = process.env.API_KEY;
+  const ai = new GoogleGenAI({ apiKey: apiKey || "MISSING_API_KEY" });
 
   const topics: TopicItem[] = [
-    {
-      id: 'mentalWellbeing',
-      title: 'Mental Well-being',
-      icon: 'fa-brain',
-      description: 'Tips for managing stress, building resilience, and seeking emotional support.',
-      sections: [
-        {
-          title: 'Learn & Cope',
-          type: 'list',
-          items: [
-            { text: 'Understanding Stress & Anxiety' },
-            { text: 'Building Emotional Resilience' },
-            { text: 'Coping with Depression & Burnout (Info)' },
-            { text: 'Mindfulness & Relaxation Techniques' },
-          ],
-        },
-        // "Coming Soon" Interactive Tools removed
-        {
-          title: 'Support',
-          type: 'list',
-          items: [
-            { text: 'Find Peer Support Groups', isLink: true },
-            { text: 'Professional Helplines Information', isLink: true },
-            // "Connect on HerPath Community (Forum)" removed as it's "Coming Soon"
-          ],
-        },
-      ],
-    },
-    {
-      id: 'physicalHealth',
-      title: 'Physical Health & Nutrition',
-      icon: 'fa-running',
-      description: 'Information on healthy eating, exercise, and hygiene.',
-      sections: [
-        {
-          title: 'Nutrition Guidance',
-          type: 'list',
-          items: [
-            { text: 'Balanced Diet for Women (All Ages)' },
-            { text: 'Nutrition during Pregnancy & Postpartum' },
-            { text: 'Healthy Recipes & Meal Ideas' },
-          ],
-        },
-        {
-          title: 'Fitness & Exercise',
-          type: 'list',
-          items: [
-            { text: 'Exercise Routines for Home' },
-            { text: 'Yoga & Flexibility' },
-            { text: 'Staying Active with a Busy Schedule' },
-          ],
-        },
-        // "Coming Soon" Interactive Tools removed
-      ],
-    },
-    {
-      id: 'menstrualHealth',
-      title: 'Menstrual Health Management',
-      icon: 'fa-calendar-alt',
-      description: 'Understanding and managing menstruation with dignity.',
-      sections: [
-        {
-          title: 'Understanding Your Cycle',
-          type: 'list',
-          items: [
-            { text: 'The Menstrual Cycle Explained' },
-            { text: 'Managing PMS & Cramps' },
-            { text: 'Hygiene Best Practices' },
-          ],
-        },
-        {
-          title: 'Tools & Support',
-          type: 'mixed',
-          items: [
-            // "Period Tracker" and "Symptom Log" removed as "Coming Soon"
-            { text: 'Expert Q&A (Content)', isLink: true },
-            // "Community Discussions" removed as "Coming Soon"
-          ],
-        },
-      ],
-    },
-    {
-      id: 'safetyRights',
-      title: 'Safety & Rights (Good Touch/Bad Touch)',
-      icon: 'fa-shield-alt',
-      description: 'Guidance on personal safety, consent, and knowing your rights.',
-      sections: [
-        {
-          title: 'Personal Safety',
-          type: 'list',
-          items: [
-            { text: 'Understanding Consent' },
-            { text: 'Recognizing Unsafe Situations' },
-            { text: 'Good Touch vs. Bad Touch (Age-Appropriate)' },
-            { text: 'Online Safety Tips' },
-          ],
-        },
-        {
-          title: 'Emergency & Legal',
-          type: 'mixed',
-          items: [
-            // "SOS Feature / Quick Helplines" removed as "Coming Soon"
-            { text: 'Know Your Legal Rights (Information)', isLink: true },
-            { text: 'Self-Advocacy Guides', isLink: true },
-          ],
-        },
-      ],
-    },
-    {
-      id: 'parentingSkills',
-      title: 'Basic Parenting Skills (if applicable)',
-      icon: 'fa-baby',
-      description: 'Resources for young mothers or those in caregiving roles.',
-      sections: [
-        {
-          title: 'Child Health & Development',
-          type: 'list',
-          items: [
-            { text: 'Newborn Care Basics' },
-            { text: 'Child Nutrition & Growth Milestones' },
-            { text: 'Positive Parenting Techniques' },
-          ],
-        },
-        {
-          title: 'Support for Caregivers',
-          type: 'list',
-          items: [
-            { text: 'Self-Care for Mothers/Caregivers' },
-            { text: 'Accessing Local Support Groups', isLink: true },
-            { text: 'Expert Advice on Common Challenges', isLink: true },
-          ],
-        },
-      ],
-    },
+    { id: 'mentalWellbeing', title: 'Mental Well-being', icon: 'fa-brain', description: 'Tips for managing stress, building resilience, and seeking emotional support.' },
+    { id: 'physicalHealth', title: 'Physical Health & Nutrition', icon: 'fa-running', description: 'Information on healthy eating, exercise, and hygiene.' },
+    { id: 'menstrualHealth', title: 'Menstrual Health Management', icon: 'fa-calendar-alt', description: 'Understanding and managing menstruation with dignity.' },
+    { id: 'safetyRights', title: 'Safety, Consent & Rights', icon: 'fa-shield-alt', description: 'Guidance on personal safety, consent, and knowing your rights.' },
+    { id: 'financialLiteracy', title: 'Basic Financial Literacy', icon: 'fa-rupee-sign', description: 'Learn to manage money, save, and plan for the future.' },
+    { id: 'parentingSkills', title: 'Basic Parenting Skills', icon: 'fa-baby', description: 'Resources for young mothers or those in caregiving roles.' },
   ];
+  
+  const parseGeneratedContent = (text: string): ParsedContent | null => {
+    const content: ParsedContent = { introduction: '', dos: [], donts: [], firstStep: '', quote: '' };
+    let currentSection: keyof ParsedContent | null = null;
+
+    text.split('\n').forEach(line => {
+        const trimmedLine = line.trim();
+        if (!trimmedLine) return;
+
+        if (trimmedLine.startsWith('[INTRODUCTION]')) {
+            currentSection = 'introduction';
+        } else if (trimmedLine.startsWith('[DO]')) {
+            currentSection = 'dos';
+        } else if (trimmedLine.startsWith('[DON\'T]')) {
+            currentSection = 'donts';
+        } else if (trimmedLine.startsWith('[FIRST_STEP]')) {
+            currentSection = 'firstStep';
+        } else if (trimmedLine.startsWith('[QUOTE]')) {
+            currentSection = 'quote';
+        } else if (currentSection) {
+            const cleanLine = trimmedLine.replace(/^- /, '');
+            if (currentSection === 'dos' || currentSection === 'donts') {
+                content[currentSection].push(cleanLine);
+            } else {
+                 content[currentSection] = (content[currentSection] ? content[currentSection] + '\n' + cleanLine : cleanLine).trim();
+            }
+        }
+    });
+
+    if (content.introduction || content.dos.length > 0 || content.firstStep) {
+        return content;
+    }
+    return null;
+  }
+
+  const fetchLifeSkillDetails = useCallback(async (topicId: string, topicTitle: string) => {
+    if (topicContent[topicId]?.content || topicContent[topicId]?.loading) return;
+
+    if (!apiKey || apiKey === "MISSING_API_KEY") {
+        setTopicContent(prev => ({ ...prev, [topicId]: { loading: false, error: "API Key is missing. Cannot fetch details.", content: null } }));
+        return;
+    }
+
+    setTopicContent(prev => ({ ...prev, [topicId]: { loading: true, error: null, content: null } }));
+
+    const langName = language === Language.HI ? "Hindi" : language === Language.TA ? "Tamil" : "Simple English";
+    const systemInstruction = `
+You are Jagriti AI, an expert and empathetic guide for the HerPath app by CREED NGO. Your audience is women and girls in India, many with low literacy. Your tone must be extremely simple, encouraging, and supportive.
+
+Your task is to provide detailed, actionable information on a specific life skill topic.
+The topic is: "${topicTitle}".
+The language MUST be: ${langName}.
+
+Provide the output in the following structured format. Use the exact tags like [INTRODUCTION].
+
+[INTRODUCTION]
+(A brief, simple, and encouraging 1-2 sentence introduction to the topic.)
+
+[DO]
+- (A practical, easy-to-do tip.)
+- (Another practical tip.)
+- (A third practical tip.)
+
+[DON'T]
+- (A simple thing to avoid, explained gently.)
+- (Another thing to avoid.)
+
+[FIRST_STEP]
+(One very small, concrete, actionable first step the user can take today. Make it sound very achievable.)
+
+[QUOTE]
+"(A short, motivational quote relevant to the topic.)"
+    `;
+
+    try {
+        const response: GenerateContentResponse = await ai.models.generateContent({
+            model: 'gemini-2.5-flash-preview-04-17',
+            contents: `Generate life skills content for the topic "${topicTitle}" in ${langName}.`,
+            config: {
+                systemInstruction,
+                temperature: 0.5,
+            }
+        });
+
+        const responseText = response.text;
+        const parsed = parseGeneratedContent(responseText);
+        
+        if (parsed) {
+             setTopicContent(prev => ({ ...prev, [topicId]: { loading: false, error: null, content: parsed } }));
+        } else {
+            throw new Error("Failed to parse the generated content from the AI.");
+        }
+       
+    } catch (err: any) {
+        console.error(`Error fetching details for ${topicTitle}:`, err);
+        setTopicContent(prev => ({ ...prev, [topicId]: { loading: false, error: `Could not load details. Please try again. (${err.message})`, content: null } }));
+    }
+  }, [language, apiKey, topicContent]);
+
+  const handleTopicToggle = (topicId: string, topicTitle: string) => {
+    const newExpandedTopicId = expandedTopicId === topicId ? null : topicId;
+    setExpandedTopicId(newExpandedTopicId);
+    if (newExpandedTopicId) {
+        fetchLifeSkillDetails(newExpandedTopicId, topicTitle);
+    }
+  };
+  
+  const handleDownload = (topicId: string, topicTitle: string) => {
+    downloadPdf(contentRefs.current[topicId], `HerPath_LifeSkill_${topicTitle.replace(/\s/g, '_')}`);
+  };
+  
+  const renderTopicContent = (topicId: string) => {
+    const topicState = topicContent[topicId];
+    if (!topicState) return null;
+
+    if (topicState.loading) {
+        return <div className="p-4 text-center"><i className="fas fa-spinner fa-spin text-teal-500 text-2xl"></i><p className="text-sm text-gray-600 mt-2">Loading details...</p></div>;
+    }
+    if (topicState.error) {
+        return <div className="p-4 text-center text-red-600 bg-red-50 rounded-md">{topicState.error}</div>;
+    }
+    if (topicState.content) {
+        const { introduction, dos, donts, firstStep, quote } = topicState.content;
+        return (
+            <div className="space-y-4">
+                {introduction && <p className="text-gray-700">{introduction}</p>}
+                
+                {dos.length > 0 && (
+                    <div className="p-3 bg-green-50 border-l-4 border-green-500 rounded-r-lg">
+                        <h4 className="font-semibold text-green-800 flex items-center"><i className="fas fa-check-circle mr-2"></i>Things To Do</h4>
+                        <ul className="list-disc list-inside pl-2 mt-1 text-green-700 text-sm space-y-1">
+                            {dos.map((item, index) => <li key={`do-${index}`}>{item}</li>)}
+                        </ul>
+                    </div>
+                )}
+
+                {donts.length > 0 && (
+                    <div className="p-3 bg-red-50 border-l-4 border-red-500 rounded-r-lg">
+                        <h4 className="font-semibold text-red-800 flex items-center"><i className="fas fa-times-circle mr-2"></i>Things To Avoid</h4>
+                        <ul className="list-disc list-inside pl-2 mt-1 text-red-700 text-sm space-y-1">
+                            {donts.map((item, index) => <li key={`dont-${index}`}>{item}</li>)}
+                        </ul>
+                    </div>
+                )}
+                
+                {firstStep && (
+                    <div className="p-3 bg-blue-50 border-l-4 border-blue-500 rounded-r-lg">
+                        <h4 className="font-semibold text-blue-800 flex items-center"><i className="fas fa-shoe-prints mr-2"></i>Your First Step</h4>
+                        <p className="mt-1 text-blue-700 text-sm">{firstStep}</p>
+                    </div>
+                )}
+
+                {quote && (
+                    <blockquote className="p-3 bg-amber-50 border-l-4 border-amber-400 text-amber-800 italic text-sm text-center">
+                        "{quote}"
+                    </blockquote>
+                )}
+            </div>
+        );
+    }
+    return null;
+  }
 
   return (
     <div>
       <SectionTitle title={translate('awarenessLifeSkills')} subtitle="Explore resources for holistic well-being and empowerment." />
       <div className="space-y-6">
         {topics.map((topic) => (
-          <Card key={topic.id} className="shadow-lg">
-            <details className="group">
-              <summary className="cursor-pointer list-none flex items-center justify-between p-4 group-hover:bg-gray-50">
-                <div className="flex items-center">
-                  <i className={`fas ${topic.icon} text-2xl text-teal-600 mr-4 w-8 text-center`}></i>
-                  <div>
-                    <h3 className="text-xl font-semibold text-teal-700">{topic.title}</h3>
-                    <p className="text-sm text-gray-600">{topic.description}</p>
-                  </div>
+          <Card key={topic.id} className="shadow-lg p-0 overflow-hidden">
+            <details open={expandedTopicId === topic.id}>
+                <summary
+                    className="cursor-pointer list-none flex items-center justify-between p-4 hover:bg-teal-50"
+                    onClick={(e) => { e.preventDefault(); handleTopicToggle(topic.id, topic.title); }}
+                    role="button"
+                    tabIndex={0}
+                    aria-expanded={expandedTopicId === topic.id}
+                >
+                    <div className="flex items-center">
+                    <i className={`fas ${topic.icon} text-2xl text-teal-600 mr-4 w-8 text-center`}></i>
+                    <div>
+                        <h3 className="text-xl font-semibold text-teal-700">{topic.title}</h3>
+                        <p className="text-sm text-gray-600">{topic.description}</p>
+                    </div>
+                    </div>
+                    <i className={`fas fa-chevron-down text-teal-600 transition-transform duration-300 ${expandedTopicId === topic.id ? 'rotate-180' : ''}`}></i>
+                </summary>
+                
+                <div className="p-4 border-t border-gray-200">
+                    <div ref={el => { contentRefs.current[topic.id] = el; }} className="p-4 bg-white rounded-lg">
+                        <h3 className="text-2xl font-semibold text-teal-700 mb-4">{topic.title}</h3>
+                        {renderTopicContent(topic.id)}
+                    </div>
+                    {topicContent[topic.id]?.content && !topicContent[topic.id]?.loading && (
+                        <div className="text-right mt-4">
+                            <DownloadButton onClick={() => handleDownload(topic.id, topic.title)} isLoading={isDownloading} className="!mt-0" />
+                        </div>
+                    )}
                 </div>
-                <i className="fas fa-chevron-down text-teal-600 group-open:rotate-180 transition-transform duration-300"></i>
-              </summary>
-              <div className="p-4 border-t border-gray-200 space-y-4">
-                {topic.sections.map((section, sectionIndex) => (
-                  <div key={sectionIndex}>
-                    <h4 className="text-md font-semibold text-gray-700 mb-2">{section.title}</h4>
-                    {section.type === 'list' && section.items.filter(item => !(item.note && item.note.toLowerCase().includes('coming soon'))).length > 0 && (
-                      <ul className="list-none space-y-1 pl-2">
-                        {section.items.filter(item => !(item.note && item.note.toLowerCase().includes('coming soon'))).map((item, itemIndex) => (
-                          <li key={itemIndex} className="text-sm text-gray-600 hover:text-teal-600">
-                            {item.isLink ? (
-                              <a href="#" onClick={(e) => e.preventDefault()} className="flex items-center">
-                                <i className={`fas ${item.icon || 'fa-external-link-alt'} fa-xs mr-2 text-teal-500`}></i>
-                                {item.text}
-                              </a>
-                            ) : (
-                              <span className="flex items-center">
-                                <i className={`fas ${item.icon || 'fa-angle-right'} fa-xs mr-2 text-teal-500`}></i>
-                                {item.text}
-                               </span>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                    {section.type === 'buttons' && section.items.filter(item => !(item.disabled && item.note && item.note.toLowerCase().includes('coming soon'))).length > 0 && (
-                      <div className="flex flex-wrap gap-2">
-                        {section.items.filter(item => !(item.disabled && item.note && item.note.toLowerCase().includes('coming soon'))).map((item, itemIndex) => (
-                          <Button
-                            key={itemIndex}
-                            size="sm"
-                            variant={'primary'}
-                            leftIcon={item.icon ? <i className={`fas ${item.icon}`}></i> : null}
-                          >
-                            {item.text}
-                          </Button>
-                        ))}
-                      </div>
-                    )}
-                     {section.type === 'mixed' && section.items.filter(item => !(item.disabled && item.note && item.note.toLowerCase().includes('coming soon'))).length > 0 && (
-                       <div className="space-y-2">
-                        {section.items.filter(item => !(item.disabled && item.note && item.note.toLowerCase().includes('coming soon'))).map((item, itemIndex) => (
-                           <div key={itemIndex} className="text-sm text-gray-600 hover:text-teal-600">
-                               <a href="#" onClick={(e) => e.preventDefault()} className="flex items-center">
-                                <i className={`fas ${item.icon || 'fa-external-link-alt'} fa-xs mr-2 text-teal-500`}></i>
-                                {item.text}
-                              </a>
-                            </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
             </details>
           </Card>
         ))}

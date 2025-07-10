@@ -1,7 +1,10 @@
+
+
 export interface User {
   id: string;
   name: string;
   email: string;
+  phoneNumber?: string;
   profilePictureUrl?: string;
   // Add other relevant user fields
 }
@@ -36,7 +39,7 @@ export interface FinancialTool {
 }
 
 export interface GovernmentScheme {
-  id: string;
+  id:string;
   name: string;
   description: string;
   eligibility: string;
@@ -92,6 +95,13 @@ export interface EmergencyContact {
   type: 'Police' | 'Ambulance' | 'Women Helpline' | 'Child Helpline' | 'NGO Support';
 }
 
+export interface CustomEmergencyContact {
+  id: string;
+  name: string;
+  relationship: string;
+  phoneNumber: string;
+}
+
 export interface ScholarshipGrant {
   id: string;
   name: string;
@@ -112,8 +122,16 @@ export interface HealthWellnessResource {
   category: 'Mental Health' | 'Physical Health' | 'Nutrition';
 }
 
-// SuccessStory interface removed
-// SuccessStoryVideo interface removed
+// --- New Interface for AI-generated Success Stories ---
+export interface SuccessStory {
+  title: string;
+  protagonistName: string;
+  challenge: string;
+  stepsTaken: string[];
+  outcome: string;
+  moral: string;
+  imageSuggestion: string; // Textual description for a potential image
+}
 
 
 export enum Language {
@@ -135,7 +153,7 @@ export interface Translations {
 export interface PathwayStepResource {
   name: string;
   type?: string;
-  url?: string;
+  howToFind?: string; // Replaces URL with text instructions
 }
 
 export interface PathwayStep {
@@ -174,7 +192,6 @@ export interface SchemeOrRightItem {
   details: string;
   howToAccess: string;
   source?: string;
-  url?: string; // Extracted URL from howToAccess or source
 }
 
 export interface DigitalLearningTip {
@@ -207,6 +224,7 @@ export interface ChatMessage {
   sender: 'user' | 'ai';
   text: string;
   timestamp?: Date;
+  image?: string; // data URL for preview and rendering
 }
 
 // --- Interface for "Learn to Use Apps" Feature ---
@@ -214,9 +232,7 @@ export interface AppRecommendation {
   id: string; // Unique ID for key prop
   name: string;
   usage: string;
-  howToUseVideoLink?: string;
   howToUseText?: string;
-  officialLink: string;
   benefits: string[];
   safetyTips?: string[];
   rawResponse?: string; // For debugging
@@ -262,4 +278,13 @@ export interface WomenLaw {
   victimRights: LawDetailContent;
   punishmentPenalty: LawDetailContent;
   realLifeExample: LawDetailContent;
+}
+
+// --- New Interface for "Document Pal" feature ---
+export interface DocumentExplanation {
+  summary: string;
+  keyPoints: string[];
+  actionItems: string[];
+  importantDates: string[];
+  disclaimer: string;
 }

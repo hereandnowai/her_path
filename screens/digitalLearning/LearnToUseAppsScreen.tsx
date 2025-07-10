@@ -1,6 +1,5 @@
-
 import React, { useState, useRef, useEffect } from 'react';
-import { GoogleGenAI, GenerateContentResponse, Chat } from "@google/genai";
+import { GoogleGenAI, GenerateContentResponse, Chat, Part } from "@google/genai";
 import { useLanguage } from '../../contexts/LanguageContext';
 import { Language, AppRecommendation, ChatMessage } from '../../types';
 import SectionTitle from '../../components/common/SectionTitle';
@@ -8,6 +7,20 @@ import Input from '../../components/common/Input';
 import Button from '../../components/common/Button';
 import Card from '../../components/common/Card';
 import AppRecommendationCard from '../../components/digitalLearning/AppRecommendationCard';
+import ChatInput from '../../components/common/ChatInput';
+import { usePdfDownloader } from '../../hooks/usePdfDownloader.ts';
+import DownloadButton from '../../components/common/DownloadButton.tsx';
+
+const fileToGenerativePart = async (file: File) => {
+    const base64EncodedDataPromise = new Promise<string>((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
+      reader.readAsDataURL(file);
+    });
+    return {
+      inlineData: { data: await base64EncodedDataPromise, mimeType: file.type },
+    };
+};
 
 const LearnToUseAppsScreen: React.FC = () => {
   const { translate, language } = useLanguage();
@@ -19,9 +32,15 @@ const LearnToUseAppsScreen: React.FC = () => {
   // Chat state
   const [chatSession, setChatSession] = useState<Chat | null>(null);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
-  const [chatInput, setChatInput] = useState('');
   const [isChatAssistantLoading, setIsChatAssistantLoading] = useState(false);
   const chatContainerRef = useRef<HTMLDivElement>(null);
+  
+  const recommendationsRef = useRef<HTMLDivElement>(null);
+  const { downloadPdf, isDownloading } = usePdfDownloader();
+
+  const handleDownload = () => {
+    downloadPdf(recommendationsRef.current, `HerPath_App_Recommendations_${goal.replace(/\s/g, '_')}`);
+  };
 
   const apiKey = process.env.API_KEY;
    if (!apiKey) {
@@ -51,9 +70,7 @@ const LearnToUseAppsScreen: React.FC = () => {
           id: item.id || `${Date.now()}-${index}`,
           name: item.name || 'Unnamed App/Website',
           usage: item.usage || 'No usage description provided.',
-          howToUseVideoLink: item.howToUseVideoLink,
           howToUseText: item.howToUseText,
-          officialLink: item.officialLink || '#',
           benefits: Array.isArray(item.benefits) ? item.benefits : [],
           safetyTips: Array.isArray(item.safetyTips) ? item.safetyTips : [],
           rawResponse: process.env.NODE_ENV === 'development' ? JSON.stringify(item, null, 2) : undefined
@@ -64,9 +81,7 @@ const LearnToUseAppsScreen: React.FC = () => {
           id: parsedData.id || `${Date.now()}-0`,
           name: parsedData.name,
           usage: parsedData.usage || 'No usage description provided.',
-          howToUseVideoLink: parsedData.howToUseVideoLink,
           howToUseText: parsedData.howToUseText,
-          officialLink: parsedData.officialLink || '#',
           benefits: Array.isArray(parsedData.benefits) ? parsedData.benefits : [],
           safetyTips: Array.isArray(parsedData.safetyTips) ? parsedData.safetyTips : [],
           rawResponse: process.env.NODE_ENV === 'development' ? JSON.stringify(parsedData, null, 2) : undefined
@@ -81,7 +96,6 @@ const LearnToUseAppsScreen: React.FC = () => {
              id: `${Date.now()}-error`,
              name: "Error Parsing Recommendation",
              usage: "Could not fully parse the AI response. Displaying raw data if available.",
-             officialLink: "#",
              benefits: [],
              rawResponse: responseText
          }];
@@ -108,21 +122,17 @@ OUTPUT FORMAT:
 For EACH app/website recommendation, you MUST provide the information in a VALID JSON format. Output a JSON array of recommendation objects. Each object in the array MUST have these exact keys with values in ${currentLanguage}:
 - "name": (string) The official name of the app or website.
 - "usage": (string) A simple, one-sentence description of what it is used for.
-- "howToUseVideoLink": (string, optional) A publicly accessible YouTube video URL showing how to use the app/website. Prioritize providing this. If not available or not applicable, omit this key or set to null.
-- "howToUseText": (string, optional) If a video link is not suitable or available, provide a very brief, step-by-step text guide (2-3 simple steps).
-- "officialLink": (string) The direct, official URL to the app (e.g., Play Store, App Store if known, otherwise website) or website.
+- "howToUseText": (string) Provide a very brief, step-by-step text guide (2-4 simple steps) on how to find, install, and start using the app. Example: "1. On your phone, open the app called 'Google Play Store'. 2. In the search bar at the top, type the name '[App Name]'. 3. Tap the 'Install' button. 4. Once it is finished, tap 'Open' to start using it."
 - "benefits": (array of strings) 2-4 key benefits in simple bullet points.
 - "safetyTips": (array of strings, optional) 1-2 crucial safety tips if relevant (e.g., for social media, financial apps).
 
 EXAMPLE OF ONE OBJECT IN THE JSON ARRAY (Content must be in ${currentLanguage}):
 {
-  "name": "Duolingo",
-  "usage": "Use it to practice English daily in a fun way.",
-  "howToUseVideoLink": "https://www.youtube.com/watch?v=VIDEO_ID_FOR_DUOLINGO_GUIDE",
-  "howToUseText": null,
-  "officialLink": "https://www.duolingo.com",
-  "benefits": ["Free to use", "Works in many Indian languages", "Learn step-by-step"],
-  "safetyTips": ["Don't share your password with anyone."]
+  "name": "WhatsApp",
+  "usage": "Use it to send messages and make calls to family and friends for free over the internet.",
+  "howToUseText": "1. Open the Google Play Store on your phone. 2. Search for 'WhatsApp'. 3. Tap the 'Install' button. 4. Open the app and follow the steps to enter your phone number.",
+  "benefits": ["Free to use with Wi-Fi", "Easy way to stay connected", "Can share photos and videos"],
+  "safetyTips": ["Do not share your personal information with unknown numbers.", "Be careful about clicking on unknown links sent in messages."]
 }
 
 IMPORTANT INSTRUCTIONS:
@@ -130,8 +140,9 @@ IMPORTANT INSTRUCTIONS:
 - Prioritize safe, verified, and free or very low-cost apps/websites.
 - Keep all descriptions, benefits, and tips extremely simple, clear, and easy to understand, suitable for users with low literacy or who are first-time app users.
 - ALL string values within the JSON output must be in ${currentLanguage}.
+- DO NOT provide any URLs, web links, or video links. The 'howToUseText' must be the only guide.
 - Only output the JSON array. Do NOT include any text before or after the JSON array. Do NOT use markdown code fences (like \`\`\`json).
-- If the array contains multiple objects, ensure they are separated by a comma (,) ONLY. No other text or characters should be between the closing brace '}' of one object and the comma, or between the comma and the opening brace '{' of the next object. The entire response must be a single, valid JSON array.
+- If the array contains multiple objects, ensure they are separated by a comma (,) ONLY. The entire response must be a single, valid JSON array.
 `;
 
 const getSystemInstructionForChat = (currentGoal: string, currentLanguage: string, appRecsString: string) => `
@@ -222,7 +233,7 @@ Now, the user has follow-up questions. Your tasks are:
              setError(translate('noSuggestionsFound'));
            }
           if (process.env.NODE_ENV === 'development' && responseText && !(parsedRecs.length === 1 && parsedRecs[0].name === "Error Parsing Recommendation")) {
-             setRecommendations([{ id: 'debug-raw', name: 'Debug Info', usage: 'Failed to parse or no valid recommendations. Raw response below.', officialLink:'#', benefits: [], rawResponse: responseText}]);
+             setRecommendations([{ id: 'debug-raw', name: 'Debug Info', usage: 'Failed to parse or no valid recommendations. Raw response below.', benefits: [], rawResponse: responseText}]);
           }
         }
       } else {
@@ -233,25 +244,39 @@ Now, the user has follow-up questions. Your tasks are:
       console.error("Gemini API error (Recommendations):", apiError);
       setError(`${translate('aiError')} ${apiError.message ? `(${apiError.message})` : ''}`);
        if (process.env.NODE_ENV === 'development' && apiError.message) {
-          setRecommendations([{ id: 'debug-apierror', name: 'API Error', usage: apiError.message, officialLink:'#', benefits: []}]);
+          setRecommendations([{ id: 'debug-apierror', name: 'API Error', usage: apiError.message, benefits: []}]);
        }
     } finally {
       setIsLoadingRecommendations(false);
     }
   };
 
-  const handleChatSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!chatInput.trim() || !chatSession || isChatAssistantLoading) return;
+  const handleChatSubmit = async (message: { text: string; file: File | null }) => {
+    if (!chatSession || isChatAssistantLoading) return;
+    
+    const { text, file } = message;
+    if (!text.trim() && !file) return;
 
-    const userMessage: ChatMessage = { sender: 'user', text: chatInput, timestamp: new Date() };
+    let imagePreviewUrl: string | undefined = undefined;
+    if (file && file.type.startsWith("image/")) {
+      imagePreviewUrl = URL.createObjectURL(file);
+    }
+
+    const userMessage: ChatMessage = { sender: 'user', text, timestamp: new Date(), image: imagePreviewUrl };
     setChatMessages(prev => [...prev, userMessage]);
-    const currentChatInput = chatInput;
-    setChatInput('');
     setIsChatAssistantLoading(true);
 
     try {
-      const response = await chatSession.sendMessage({message: currentChatInput});
+      const messageParts: Part[] = [];
+      if (text.trim()) {
+        messageParts.push({ text: text.trim() });
+      }
+      if (file) {
+        const filePart = await fileToGenerativePart(file);
+        messageParts.push(filePart);
+      }
+      
+      const response = await chatSession.sendMessage({message: messageParts});
       const aiMessageText = response.text;
 
       if (aiMessageText) {
@@ -324,12 +349,17 @@ Now, the user has follow-up questions. Your tasks are:
       )}
 
       {!isLoadingRecommendations && !error && recommendations.length > 0 && !(recommendations.length === 1 && recommendations[0].name === "Error Parsing Recommendation") && (
-        <div>
-          <h2 className="text-2xl font-semibold text-gray-800 mb-6">{translate('appRecommendations')}</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {recommendations.map((rec) => (
-              <AppRecommendationCard key={rec.id} recommendation={rec} />
-            ))}
+        <div className="mt-8">
+            <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-semibold text-gray-800">{translate('appRecommendations')}</h2>
+                <DownloadButton onClick={handleDownload} isLoading={isDownloading} className="!mt-0" />
+            </div>
+          <div ref={recommendationsRef} className="p-4 bg-white rounded-lg">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {recommendations.map((rec) => (
+                <AppRecommendationCard key={rec.id} recommendation={rec} />
+                ))}
+            </div>
           </div>
         </div>
       )}
@@ -357,7 +387,8 @@ Now, the user has follow-up questions. Your tasks are:
                         msg.sender === 'user' ? 'bg-teal-500 text-white' : 'bg-white text-gray-800 border border-gray-200'
                     }`}
                 >
-                  <p className="whitespace-pre-wrap text-sm">{msg.text}</p>
+                  {msg.image && <img src={msg.image} alt="User upload" className="rounded-lg mb-2 max-w-xs" />}
+                  {msg.text && <p className="whitespace-pre-wrap text-sm">{msg.text}</p>}
                   {msg.timestamp && (
                     <p className={`text-xs mt-1 ${msg.sender === 'user' ? 'text-teal-100 text-right' : 'text-gray-400 text-left'}`}>
                       {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -375,28 +406,12 @@ Now, the user has follow-up questions. Your tasks are:
               </div>
             )}
           </div>
-          <form onSubmit={handleChatSubmit} className="flex gap-3 p-4 pt-0">
-            <Input
-              type="text"
-              value={chatInput}
-              onChange={(e) => setChatInput(e.target.value)}
-              placeholder={translate('typeYourQuestion')}
-              className="flex-grow !mb-0 text-sm"
-              wrapperClassName="flex-grow !mb-0"
-              disabled={isChatAssistantLoading || !apiKey || apiKey === "MISSING_API_KEY"}
-              aria-label={translate('typeYourQuestion')}
-            />
-            <Button 
-                type="submit" 
-                disabled={isChatAssistantLoading || !chatInput.trim() || !apiKey || apiKey === "MISSING_API_KEY"}
-                aria-label={translate('send')}
-                className="px-4"
-            >
-              <i className="fas fa-paper-plane"></i>
-              <span className="sr-only">{translate('send')}</span>
-            </Button>
-          </form>
-           {(!apiKey || apiKey === "MISSING_API_KEY") && <p role="alert" className="text-red-500 text-xs text-center pb-2 px-4">API Key is missing. Chat assistant is disabled.</p>}
+          <ChatInput
+            onSendMessage={handleChatSubmit}
+            isLoading={isChatAssistantLoading}
+            placeholder={translate('typeYourQuestion')}
+            apiKeyAvailable={!!apiKey && apiKey !== 'MISSING_API_KEY'}
+           />
         </Card>
       )}
     </div>

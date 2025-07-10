@@ -1,18 +1,19 @@
 
+
 import React, { useState } from 'react';
-import * as ReactRouterDOM from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import Button from '../../components/common/Button';
 import Input from '../../components/common/Input';
 import { APP_ROUTES } from '../../constants';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
-import CreedLogo from '../../components/common/CreedLogo';
+import HerPathLogo from '../../components/common/HerPathLogo';
 
 const LoginScreen: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const navigate = ReactRouterDOM.useNavigate();
+  const navigate = useNavigate();
   const { login } = useAuth();
   const { translate } = useLanguage();
 
@@ -32,7 +33,7 @@ const LoginScreen: React.FC = () => {
     <div className="min-h-screen flex items-center justify-center bg-gray-100 p-6">
       <div className="bg-white p-8 md:p-12 rounded-xl shadow-2xl w-full max-w-md">
         <div className="text-center mb-8">
-           <CreedLogo size={80} className="mx-auto mb-4" />
+           <HerPathLogo size={80} className="mx-auto mb-4" />
           <h2 className="text-3xl font-bold text-teal-700">{translate('login')}</h2>
         </div>
         {error && <p className="mb-4 text-center text-red-600 bg-red-100 p-3 rounded-md">{error}</p>}
@@ -61,9 +62,9 @@ const LoginScreen: React.FC = () => {
         </form>
         <p className="mt-8 text-center text-gray-600 text-lg">
           {translate('dontHaveAccount')}{' '}
-          <ReactRouterDOM.Link to={APP_ROUTES.REGISTER} className="font-semibold text-teal-600 hover:text-teal-700">
+          <Link to={APP_ROUTES.REGISTER} className="font-semibold text-teal-600 hover:text-teal-700">
             {translate('register')}
-          </ReactRouterDOM.Link>
+          </Link>
         </p>
       </div>
     </div>

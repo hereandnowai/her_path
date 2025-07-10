@@ -1,11 +1,11 @@
-
 import React, { useState, useEffect, useRef } from 'react';
-import { GoogleGenAI, GenerateContentResponse, Chat } from "@google/genai"; // Added Chat
+import { GoogleGenAI, GenerateContentResponse, Chat, Part } from "@google/genai";
 import { useLanguage } from '../../contexts/LanguageContext';
 import SectionTitle from '../../components/common/SectionTitle';
 import Card from '../../components/common/Card';
 import Input from '../../components/common/Input';
 import Button from '../../components/common/Button';
+import ChatInput from '../../components/common/ChatInput'; // Import the new component
 import { GUIDANCE_CATEGORIES, UI_TEXT } from '../../constants';
 import { 
   Language,
@@ -19,11 +19,26 @@ import {
   SchemeOrRightItem,
   DigitalLearningTip,
   MotivationalSupportModule,
-  ChatMessage // Added ChatMessage
+  ChatMessage
 } from '../../types'; 
+import { usePdfDownloader } from '../../hooks/usePdfDownloader.ts';
+import DownloadButton from '../../components/common/DownloadButton.tsx';
+import { useAuth } from '../../contexts/AuthContext.tsx';
+
+const fileToGenerativePart = async (file: File) => {
+    const base64EncodedDataPromise = new Promise<string>((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
+      reader.readAsDataURL(file);
+    });
+    return {
+      inlineData: { data: await base64EncodedDataPromise, mimeType: file.type },
+    };
+};
 
 const GuidancePathwayScreen: React.FC = () => {
   const { translate, language } = useLanguage();
+  const { user } = useAuth();
   const [category, setCategory] = useState<string>(GUIDANCE_CATEGORIES[0].id);
   const [educationLevel, setEducationLevel] = useState('');
   const [careerGoal, setCareerGoal] = useState('');
@@ -38,9 +53,16 @@ const GuidancePathwayScreen: React.FC = () => {
   // State for chat functionality
   const [chat, setChat] = useState<Chat | null>(null);
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
-  const [chatInput, setChatInput] = useState('');
   const [isChatLoading, setIsChatLoading] = useState(false);
   const chatHistoryRef = useRef<HTMLDivElement>(null);
+  
+  // Ref and hook for PDF download
+  const guidanceRef = useRef<HTMLDivElement>(null);
+  const { downloadPdf, isDownloading } = usePdfDownloader();
+
+  const handleDownload = () => {
+    downloadPdf(guidanceRef.current, `HerPath_Pathway_${user?.name?.replace(' ', '_') || 'User'}`);
+  };
 
 
   const apiKey = process.env.API_KEY;
@@ -55,12 +77,6 @@ const GuidancePathwayScreen: React.FC = () => {
       chatHistoryRef.current.scrollTop = chatHistoryRef.current.scrollHeight;
     }
   }, [chatHistory]);
-
-  const extractUrl = (text: string): string | undefined => {
-    const urlRegex = /(https?:\/\/[^\s()]+)/g;
-    const match = text.match(urlRegex);
-    return match ? match[0] : undefined;
-  };
   
   const parseGeneratedGuidanceText = (text: string): GeneratedGuidance => {
     console.log("Starting to parse generated guidance text.");
@@ -77,57 +93,27 @@ const GuidancePathwayScreen: React.FC = () => {
         stepsRaw.forEach(stepRaw => {
           const step: PathwayStep = { stepTitle: '', dos: [], donts: [], resources: [], tip: '' };
           const lines = stepRaw.split(/\r\n|\r|\n/).map(l => l.trim()).filter(l => l);
-          let resourcesStrAccumulator = "";
           lines.forEach(line => {
             if (line.match(/^Step \d+\s*[:\-]?\s*.*/i)) step.stepTitle = line;
             else if (line.match(/^DO\s*[:\-]?\s*/i)) step.dos.push(line.replace(/^DO\s*[:\-]?\s*/i, '').trim());
             else if (line.match(/^DON'T\s*[:\-]?\s*/i)) step.donts.push(line.replace(/^DON'T\s*[:\-]?\s*/i, '').trim());
-            else if (line.match(/^(?:Resources\s*[:\-]?\s*|🎥|📘|📓|🌐)/i)) {
-                resourcesStrAccumulator += line.replace(/^(?:Resources\s*[:\-]?\s*)/i, '').trim() + "\n";
+            else if (line.match(/^Resources\s*[:\-]?\s*/i)) {
+              // Handle multiline resources
+              const resItemsRaw = line.replace(/^Resources\s*[:\-]?\s*/i, '').split(/,(?![^\[]*\])/).map(r => r.trim()).filter(r => r);
+              resItemsRaw.forEach(res => {
+                  const nameMatch = res.match(/^(?:🎥|📘|📓|🌐)?\s*([^(\n]*)/i);
+                  let name = nameMatch ? nameMatch[1].trim() : res;
+                  const typeMatch = res.match(/\(Type:\s*([^)]+)\)/i);
+                  const howToFindMatch = res.match(/\(How to Find:\s*([^)]+)\)/i);
+                  step.resources.push({
+                      name: name,
+                      type: typeMatch ? typeMatch[1].trim() : undefined,
+                      howToFind: howToFindMatch ? howToFindMatch[1].trim() : undefined,
+                  });
+              });
             }
             else if (line.match(/^Tip\s*[:\-]?\s*/i)) step.tip = line.replace(/^Tip\s*[:\-]?\s*/i, '').trim();
           });
-
-          if (resourcesStrAccumulator) {
-            const resItems = resourcesStrAccumulator.trim().split(/\s*,\s*(?![^\[]*\]\([^\)]*\))|\s*\n\s*(?=(?:🎥|📘|📓|🌐))/g);
-            resItems.forEach(resItemStr => {
-              if (!resItemStr.trim()) return;
-              let name = resItemStr.trim();
-              let type: string | undefined = undefined;
-              let url: string | undefined = undefined;
-              const markdownLinkMatch = name.match(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/);
-              if (markdownLinkMatch) {
-                name = markdownLinkMatch[1].trim();
-                url = markdownLinkMatch[2].trim();
-              }
-              const typeMatchExplicit = name.match(/\(Type:\s*([^)]+)\)/i);
-              if (typeMatchExplicit) {
-                type = typeMatchExplicit[1].trim();
-                name = name.replace(/\(Type:\s*[^)]+\)/i, '').trim();
-              } else if (resItemStr.startsWith('🎥')) type = 'Video';
-              else if (resItemStr.startsWith('📘')) type = 'Book/PDF';
-              else if (resItemStr.startsWith('📓')) type = 'Notes/Material';
-              else if (resItemStr.startsWith('🌐')) type = 'Website/Platform';
-              name = name.replace(/^(?:🎥|📘|📓|🌐)\s*/, '').trim();
-              if (!url) {
-                  const urlMatchExplicit = resItemStr.match(/URL:\s*(https?:\/\/[^\s)]+)/i);
-                  if (urlMatchExplicit) {
-                      url = urlMatchExplicit[1].trim();
-                      name = name.replace(/URL:\s*https?:\/\/[^\s)]+/i, '').trim();
-                  } else {
-                      const potentialUrl = extractUrl(name);
-                      if(potentialUrl && name.startsWith(potentialUrl)) {
-                          url = potentialUrl;
-                          name = name.replace(potentialUrl, '').trim() || potentialUrl;
-                      }
-                  }
-              }
-              name = name.replace(/→\s*$/, '').trim();
-              if (name) {
-                step.resources.push({ name, type, url });
-              }
-            });
-          }
           if (step.stepTitle) pathwayModule.steps.push(step);
         });
         if(pathwayModule.steps.length > 0) guidance.educationalPathway = pathwayModule;
@@ -191,12 +177,10 @@ const GuidancePathwayScreen: React.FC = () => {
                 const accessMatch = itemStr.match(/How to Access\s*[:\-]?\s*([^(\r\n|\r|\n)]*)/i);
                 if (accessMatch) {
                    item.howToAccess = accessMatch[1].trim();
-                   item.url = extractUrl(item.howToAccess);
                 }
                 const sourceMatch = itemStr.match(/Source\s*[:\-]?\s*([^(\r\n|\r|\n)]*)/i);
                 if (sourceMatch) {
                   item.source = sourceMatch[1].trim();
-                  if(!item.url) item.url = extractUrl(item.source);
                 }
                 schemesModule.push(item);
             }
@@ -279,11 +263,7 @@ Strictly generate all the following 5 modules in order. Each module's content MU
        DO: [Simple, actionable advice 2 (optional)]
        DON'T: [Thing to avoid 1. Explain gently why.]
        DON'T: [Thing to avoid 2 (optional)]
-       Resources: [Provide 2-4 resources using the emoji prefixes below. Each resource should have Name (Type: e.g., Video, Book PDF, Notes, Website - URL: MUST include a valid, publicly accessible URL. If a specific URL is unknown, provide a general official portal URL like 'https://www.swayam.gov.in', 'https://www.diksha.gov.in', 'https://epathshala.nic.in' or a descriptive placeholder like 'https://example.gov.in/search?q=[Resource+Name]' and CLEARLY STATE it's a general/placeholder link. Explain what the resource is for in simple terms.)]
-         🎥 [Video Name (Type: Video - URL: ...)]
-         📘 [Book Name (Type: Book with free PDF - URL: ...)]
-         📓 [Notes/Material Name (Type: Downloadable Notes - URL: ...)]
-         🌐 [Website/Platform Name (Type: Useful Website - URL: ...)]
+       Resources: [Provide 2-4 resources as a comma-separated list. Each resource MUST be in the format: "[Emoji] [Resource Name] (Type: [e.g., Video, Book PDF, Website]) (How to Find: [Short text instruction, e.g., 'Search for this on YouTube', 'Find this on the NCERT website'])". DO NOT PROVIDE ANY URLs/WEB LINKS.]
        Tip: [Short motivational or practical life skill tip. Be very encouraging! e.g., "Remember, asking questions is a sign of strength! We can learn anything step-by-step."]
      --- (Use three hyphens as a separator ONLY BETWEEN steps within this module)
    - If user has no specific goal, suggest 2-3 suitable career paths relevant to their age and education level, and build the pathway towards one of them.
@@ -308,8 +288,8 @@ Strictly generate all the following 5 modules in order. Each module's content MU
    - Format for each item:
      [Emoji: 👩‍🎓/💰/⚖] [Type: Scholarship/Scheme/Right]: [Name of item]
        Details: [Brief description of benefit in very simple terms. Mention eligibility if it's easy to explain.]
-       How to Access: [Provide official URL for application/information if available and well-known (e.g., National Scholarship Portal, a major state portal). If direct link is complex or unknown, give general advice like 'Ask a teacher or at the local Panchayat office about this scheme' OR 'Search for "[Scheme Name]" on the official India government website (india.gov.in).'. Clearly state if a link is a general portal. Example URL: https://scholarships.gov.in/]
-       Source: [Official website/source if available with URL. Example: Ministry of Women & Child Development website.]
+       How to Access: [Provide a text-based instruction. DO NOT provide URLs. E.g., 'Ask a teacher or at the local Panchayat office about this scheme' OR 'Search for "[Scheme Name]" on the official India government website (india.gov.in).']
+       Source: [Name of the official source, e.g., 'Ministry of Women & Child Development'. DO NOT provide a URL.]
 --- END OF MODULE ---
 
 4️⃣ DIGITAL LEARNING & APP USAGE TRAINING (Using a Smartphone for Learning)
@@ -373,7 +353,7 @@ Interests/Hobbies: ${interests || 'Not specified'}
 
 Please generate the personalized 5-module guidance pathway based on these details and the system instructions provided.
 Ensure "--- END OF MODULE ---" is present after each of the 5 modules.
-Make sure to provide URLs or valid placeholder URLs for resources and schemes as instructed.
+Make sure to provide text instructions on how to find resources and schemes. DO NOT PROVIDE URLs.
 Adopt a very supportive, encouraging, and mentor-like tone throughout the response, using simple language suitable for users with limited literacy.
 `;
 
@@ -436,19 +416,33 @@ Adopt a very supportive, encouraging, and mentor-like tone throughout the respon
     }
   };
 
-  const handleChatSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!chatInput.trim() || !chat || isChatLoading) return;
+  const handleChatSubmit = async (message: { text: string; file: File | null }) => {
+    if (!chat || isChatLoading) return;
 
-    const userMessage: ChatMessage = { sender: 'user', text: chatInput, timestamp: new Date() };
+    const { text, file } = message;
+    if (!text.trim() && !file) return;
+
+    let imagePreviewUrl: string | undefined = undefined;
+    if (file && file.type.startsWith("image/")) {
+      imagePreviewUrl = URL.createObjectURL(file);
+    }
+    
+    const userMessage: ChatMessage = { sender: 'user', text, timestamp: new Date(), image: imagePreviewUrl };
     setChatHistory(prev => [...prev, userMessage]);
-    const currentChatInput = chatInput;
-    setChatInput('');
     setIsChatLoading(true);
 
     try {
-      console.log("Sending chat message to Gemini API:", currentChatInput);
-      const response = await chat.sendMessage({message: currentChatInput});
+      console.log("Sending chat message to Gemini API...");
+      const messageParts: Part[] = [];
+      if (text.trim()) {
+        messageParts.push({ text: text.trim() });
+      }
+      if (file) {
+        const filePart = await fileToGenerativePart(file);
+        messageParts.push(filePart);
+      }
+      
+      const response = await chat.sendMessage({ message: messageParts });
       const aiMessageText = response.text;
       
       if (aiMessageText) {
@@ -475,14 +469,14 @@ Adopt a very supportive, encouraging, and mentor-like tone throughout the respon
     if (resource.type) {
         resourceDisplay = `${resource.name} (${resource.type})`;
     }
-    if (resource.url) {
-      return (
-        <a href={resource.url} target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:text-teal-700 underline">
-          {resourceDisplay} <i className="fas fa-external-link-alt text-xs"></i>
-        </a>
-      );
-    }
-    return <span className="text-gray-700">{resourceDisplay}</span>;
+    return (
+      <div className="text-gray-700">
+        <span>{resourceDisplay}</span>
+        {resource.howToFind && (
+            <p className="text-xs text-gray-500 italic pl-2">↪ How to find: {resource.howToFind}</p>
+        )}
+      </div>
+    );
   };
 
   return (
@@ -532,142 +526,140 @@ Adopt a very supportive, encouraging, and mentor-like tone throughout the respon
       )}
 
       {generatedGuidance && (
-        <div className="space-y-8 mt-10">
-          {/* Pathway Display (existing logic) */}
-          {generatedGuidance.educationalPathway && generatedGuidance.educationalPathway.steps.length > 0 && (
-            <Card>
-              <h2 className="text-2xl font-semibold text-teal-700 mb-4">1️⃣ Educational & Career Pathway</h2>
-              <div className="space-y-6">
-                {generatedGuidance.educationalPathway.steps.map((step, index) => (
-                  <Card key={index} className="border border-teal-200 shadow-md">
-                    <h3 className="text-xl font-semibold text-teal-700 mb-3">{step.stepTitle || `${translate('step')} ${index + 1}`}</h3>
-                    {step.dos.length > 0 && (<div className="mb-2"><h4 className="text-md font-medium text-green-700"><i className="fas fa-check-circle mr-2" aria-hidden="true"></i>{translate('dos')}</h4><ul className="list-disc list-inside text-gray-700 pl-4">{step.dos.map((item, i) => <li key={i}>{item}</li>)}</ul></div>)}
-                    {step.donts.length > 0 && (<div className="mb-2"><h4 className="text-md font-medium text-red-700"><i className="fas fa-times-circle mr-2" aria-hidden="true"></i>{translate('donts')}</h4><ul className="list-disc list-inside text-gray-700 pl-4">{step.donts.map((item, i) => <li key={i}>{item}</li>)}</ul></div>)}
-                    {step.resources.length > 0 && (<div className="mb-2"><h4 className="text-md font-medium text-blue-700"><i className="fas fa-book-reader mr-2" aria-hidden="true"></i>{translate('resources')}</h4><ul className="list-disc list-inside text-gray-700 pl-4">{step.resources.map((item, i) => <li key={i}>{renderPathwayStepResource(item)}</li>)}</ul></div>)}
-                    {step.tip && (<div><h4 className="text-md font-medium text-amber-700"><i className="fas fa-lightbulb mr-2" aria-hidden="true"></i>{translate('tip')}</h4><p className="text-gray-700 italic pl-4">{step.tip}</p></div>)}
-                  </Card>
-                ))}
-              </div>
-            </Card>
-          )}
-          {generatedGuidance.lifeAwarenessModule && (generatedGuidance.lifeAwarenessModule.ageGroupFocus || generatedGuidance.lifeAwarenessModule.topics.length > 0) && (
-            <Card>
-                <h2 className="text-2xl font-semibold text-teal-700 mb-4">2️⃣ Life Awareness & Safety</h2>
-                {generatedGuidance.lifeAwarenessModule.ageGroupFocus && <p className="text-lg text-gray-700 mb-3"><strong>Focus:</strong> {generatedGuidance.lifeAwarenessModule.ageGroupFocus}</p>}
-                <div className="space-y-6">
-                    {generatedGuidance.lifeAwarenessModule.topics.map((topic,idx) => (
-                        <Card key={idx} className="border border-gray-200 shadow-sm">
-                            <h4 className="text-xl font-medium text-teal-600 mb-2">{topic.topicTitle}</h4>
-                            {topic.guidancePoints.map((gp, gpIdx) => (
-                                <div key={gpIdx} className="mb-3 pb-3 border-b border-gray-100 last:border-b-0">
-                                    <p className="text-gray-700 flex items-start">
-                                      <i className="fas fa-lightbulb text-yellow-500 mr-2 mt-1 flex-shrink-0" aria-hidden="true"></i>
-                                      <span>{gp.point}</span>
-                                    </p>
-                                    {gp.visualCue && (
-                                      <div className="mt-2 pl-6">
-                                        {/* Removed img tag that used picsum.photos */}
-                                        <p className="text-xs text-gray-500 italic mt-1 p-2 bg-gray-50 rounded text-center">Visual suggestion: {gp.visualCue}</p>
-                                      </div>
-                                    )}
+        <div className="mt-10">
+            <div className="text-right mb-2">
+                <DownloadButton onClick={handleDownload} isLoading={isDownloading} />
+            </div>
+            <div ref={guidanceRef} className="space-y-8 p-4 bg-white rounded-lg">
+                {/* Pathway Display */}
+                {generatedGuidance.educationalPathway && generatedGuidance.educationalPathway.steps.length > 0 && (
+                    <Card>
+                    <h2 className="text-2xl font-semibold text-teal-700 mb-4">1️⃣ Educational & Career Pathway</h2>
+                    <div className="space-y-6">
+                        {generatedGuidance.educationalPathway.steps.map((step, index) => (
+                        <Card key={index} className="border border-teal-200 shadow-md">
+                            <h3 className="text-xl font-semibold text-teal-700 mb-3">{step.stepTitle || `${translate('step')} ${index + 1}`}</h3>
+                            {step.dos.length > 0 && (<div className="mb-2"><h4 className="text-md font-medium text-green-700"><i className="fas fa-check-circle mr-2" aria-hidden="true"></i>{translate('dos')}</h4><ul className="list-disc list-inside text-gray-700 pl-4">{step.dos.map((item, i) => <li key={i}>{item}</li>)}</ul></div>)}
+                            {step.donts.length > 0 && (<div className="mb-2"><h4 className="text-md font-medium text-red-700"><i className="fas fa-times-circle mr-2" aria-hidden="true"></i>{translate('donts')}</h4><ul className="list-disc list-inside text-gray-700 pl-4">{step.donts.map((item, i) => <li key={i}>{item}</li>)}</ul></div>)}
+                            {step.resources.length > 0 && (<div className="mb-2"><h4 className="text-md font-medium text-blue-700"><i className="fas fa-book-reader mr-2" aria-hidden="true"></i>{translate('resources')}</h4><ul className="list-disc list-inside text-gray-700 pl-4">{step.resources.map((item, i) => <li key={i}>{renderPathwayStepResource(item)}</li>)}</ul></div>)}
+                            {step.tip && (<div><h4 className="text-md font-medium text-amber-700"><i className="fas fa-lightbulb mr-2" aria-hidden="true"></i>{translate('tip')}</h4><p className="text-gray-700 italic pl-4">{step.tip}</p></div>)}
+                        </Card>
+                        ))}
+                    </div>
+                    </Card>
+                )}
+                {generatedGuidance.lifeAwarenessModule && (generatedGuidance.lifeAwarenessModule.ageGroupFocus || generatedGuidance.lifeAwarenessModule.topics.length > 0) && (
+                    <Card>
+                        <h2 className="text-2xl font-semibold text-teal-700 mb-4">2️⃣ Life Awareness & Safety</h2>
+                        {generatedGuidance.lifeAwarenessModule.ageGroupFocus && <p className="text-lg text-gray-700 mb-3"><strong>Focus:</strong> {generatedGuidance.lifeAwarenessModule.ageGroupFocus}</p>}
+                        <div className="space-y-6">
+                            {generatedGuidance.lifeAwarenessModule.topics.map((topic,idx) => (
+                                <Card key={idx} className="border border-gray-200 shadow-sm">
+                                    <h4 className="text-xl font-medium text-teal-600 mb-2">{topic.topicTitle}</h4>
+                                    {topic.guidancePoints.map((gp, gpIdx) => (
+                                        <div key={gpIdx} className="mb-3 pb-3 border-b border-gray-100 last:border-b-0">
+                                            <p className="text-gray-700 flex items-start">
+                                            <i className="fas fa-lightbulb text-yellow-500 mr-2 mt-1 flex-shrink-0" aria-hidden="true"></i>
+                                            <span>{gp.point}</span>
+                                            </p>
+                                            {gp.visualCue && (
+                                            <div className="mt-2 pl-6">
+                                                {/* Removed img tag that used picsum.photos */}
+                                                <p className="text-xs text-gray-500 italic mt-1 p-2 bg-gray-50 rounded text-center">Visual suggestion: {gp.visualCue}</p>
+                                            </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                    {topic.audioTip && <p className="text-sm text-blue-500 mt-2 pl-2 italic"><i className="fas fa-volume-up mr-1" aria-hidden="true"></i> {topic.audioTip}</p>}
+                                </Card>
+                            ))}
+                        </div>
+                    </Card>
+                )}
+                {generatedGuidance.schemesAndRights && generatedGuidance.schemesAndRights.length > 0 && (
+                    <Card>
+                    <h2 className="text-2xl font-semibold text-teal-700 mb-4">3️⃣ Scholarships, Schemes & Rights</h2>
+                    <ul className="space-y-4">
+                        {generatedGuidance.schemesAndRights.map((item, index) => (
+                        <li key={index} className="p-3 border rounded-md border-gray-200">
+                            <h4 className="text-xl font-medium text-teal-600 mb-1">{item.emoji} {item.type}: {item.name}</h4>
+                            <p className="text-gray-700 mb-1"><strong>Details:</strong> {item.details}</p>
+                            <p className="text-gray-700">
+                                <strong>How to Access:</strong> {item.howToAccess}
+                            </p>
+                            {item.source && <p className="text-sm text-gray-500"><strong>Source:</strong> {item.source}</p>}
+                        </li>
+                        ))}
+                    </ul>
+                    </Card>
+                )}
+                {generatedGuidance.digitalLearningTips && generatedGuidance.digitalLearningTips.length > 0 && (
+                    <Card>
+                        <h2 className="text-2xl font-semibold text-teal-700 mb-4">4️⃣ Digital Learning Tips</h2>
+                        <div className="space-y-4">
+                            {generatedGuidance.digitalLearningTips.map((tip, index) =>(
+                                <div key={index} className="p-3 border rounded-md border-gray-200">
+                                    <h4 className="text-xl font-medium text-teal-600">App: {tip.app}</h4>
+                                    {tip.howToUse.split('\n').map((line, lineIdx) => (
+                                    <p key={lineIdx} className="text-gray-700 my-1">{lineIdx === 0 ? <strong>How to Use: </strong> : null}{line.replace(/^How to Use\s*[:\-]?\s*/i, "")}</p>
+                                    ))}
+                                    <p className="text-gray-700"><strong>Example Task:</strong> "{tip.exampleSearchOrTask}"</p>
+                                    {tip.visualCue && <p className="text-sm text-gray-500 italic mt-1">(Visual idea: {tip.visualCue})</p>}
+                                    {tip.audioTip && <p className="text-sm text-blue-500 mt-1 italic"><i className="fas fa-volume-up mr-1" aria-hidden="true"></i> {tip.audioTip}</p>}
                                 </div>
                             ))}
-                            {topic.audioTip && <p className="text-sm text-blue-500 mt-2 pl-2 italic"><i className="fas fa-volume-up mr-1" aria-hidden="true"></i> {topic.audioTip}</p>}
-                        </Card>
-                    ))}
-                </div>
-            </Card>
-          )}
-          {generatedGuidance.schemesAndRights && generatedGuidance.schemesAndRights.length > 0 && (
-            <Card>
-              <h2 className="text-2xl font-semibold text-teal-700 mb-4">3️⃣ Scholarships, Schemes & Rights</h2>
-               <ul className="space-y-4">
-                {generatedGuidance.schemesAndRights.map((item, index) => (
-                  <li key={index} className="p-3 border rounded-md">
-                    <h4 className="text-xl font-medium text-teal-600 mb-1">{item.emoji} {item.type}: {item.name}</h4>
-                    <p className="text-gray-700 mb-1"><strong>Details:</strong> {item.details}</p>
-                    <p className="text-gray-700">
-                        <strong>How to Access:</strong> {item.url ? <a href={item.url} target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:underline">{item.howToAccess.replace(item.url, '').trim() || item.howToAccess} <i className="fas fa-external-link-alt text-xs" aria-hidden="true"></i></a> : item.howToAccess}
-                    </p>
-                    {item.source && <p className="text-sm text-gray-500"><strong>Source:</strong> {extractUrl(item.source) ? <a href={extractUrl(item.source)!} target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:underline">{item.source.replace(extractUrl(item.source)!, '').trim() || item.source} <i className="fas fa-external-link-alt text-xs" aria-hidden="true"></i></a> : item.source}</p>}
-                  </li>
-                ))}
-              </ul>
-            </Card>
-          )}
-        {generatedGuidance.digitalLearningTips && generatedGuidance.digitalLearningTips.length > 0 && (
-            <Card>
-                <h2 className="text-2xl font-semibold text-teal-700 mb-4">4️⃣ Digital Learning Tips</h2>
-                <div className="space-y-4">
-                    {generatedGuidance.digitalLearningTips.map((tip, index) =>(
-                        <div key={index} className="p-3 border rounded-md">
-                            <h4 className="text-xl font-medium text-teal-600">App: {tip.app}</h4>
-                            {tip.howToUse.split('\n').map((line, lineIdx) => (
-                              <p key={lineIdx} className="text-gray-700 my-1">{lineIdx === 0 ? <strong>How to Use: </strong> : null}{line.replace(/^How to Use\s*[:\-]?\s*/i, "")}</p>
-                            ))}
-                            <p className="text-gray-700"><strong>Example Task:</strong> "{tip.exampleSearchOrTask}"</p>
-                            {tip.visualCue && <p className="text-sm text-gray-500 italic mt-1">(Visual idea: {tip.visualCue})</p>}
-                            {tip.audioTip && <p className="text-sm text-blue-500 mt-1 italic"><i className="fas fa-volume-up mr-1" aria-hidden="true"></i> {tip.audioTip}</p>}
                         </div>
-                    ))}
-                </div>
-            </Card>
-          )}
-          {generatedGuidance.motivationalSupport && (generatedGuidance.motivationalSupport.personalizedEncouragement || generatedGuidance.motivationalSupport.quote || generatedGuidance.motivationalSupport.nextStep) && (
-             <Card className="bg-teal-50 border-l-4 border-teal-500">
-                <h2 className="text-2xl font-semibold text-teal-700 mb-4">5️⃣ Motivational Support</h2>
-                {generatedGuidance.motivationalSupport.personalizedEncouragement && <p className="text-lg text-teal-800 mb-3">🌟 {generatedGuidance.motivationalSupport.personalizedEncouragement}</p>}
-                {generatedGuidance.motivationalSupport.quote && <p className="text-lg italic text-teal-800 mb-3">🌟 "{generatedGuidance.motivationalSupport.quote}"</p>}
-                {generatedGuidance.motivationalSupport.nextStep && <p className="text-lg text-gray-700 mb-2">✅ <strong>Your Next Step:</strong> {generatedGuidance.motivationalSupport.nextStep}</p>}
-                {generatedGuidance.motivationalSupport.reminder && <p className="text-md text-gray-600">🔁 {generatedGuidance.motivationalSupport.reminder}</p>}
-            </Card>
-          )}
-          
-          {/* Chat Section */}
-          {chat && (
-            <Card className="mt-8">
-              <h2 className="text-2xl font-semibold text-teal-700 mb-4">Talk to HerPath AI</h2>
-              <div ref={chatHistoryRef} className="h-96 overflow-y-auto mb-4 p-4 border border-gray-200 rounded-lg bg-gray-50 space-y-4">
-                {chatHistory.map((msg, index) => (
-                  <div key={index} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-xl p-3 rounded-xl shadow ${msg.sender === 'user' ? 'bg-teal-500 text-white' : 'bg-white text-gray-800'}`}>
-                      <p className="whitespace-pre-wrap">{msg.text}</p>
-                      {msg.timestamp && <p className={`text-xs mt-1 ${msg.sender === 'user' ? 'text-teal-100' : 'text-gray-400'}`}>{msg.timestamp.toLocaleTimeString()}</p>}
-                    </div>
-                  </div>
-                ))}
-                {isChatLoading && (
-                  <div className="flex justify-start">
-                    <div className="max-w-xl p-3 rounded-lg shadow bg-white text-gray-800">
-                      <i className="fas fa-spinner fa-spin mr-2"></i> AI is typing...
-                    </div>
-                  </div>
+                    </Card>
                 )}
-              </div>
-              <form onSubmit={handleChatSubmit} className="flex gap-2">
-                <Input
-                  type="text"
-                  value={chatInput}
-                  onChange={(e) => setChatInput(e.target.value)}
-                  placeholder="Ask a follow-up question..."
-                  className="flex-grow !mb-0" // Override default margin bottom from Input component
-                  wrapperClassName="flex-grow !mb-0"
-                  disabled={isChatLoading || !apiKey || apiKey === "MISSING_API_KEY"}
-                />
-                <Button type="submit" disabled={isChatLoading || !chatInput.trim() || !apiKey || apiKey === "MISSING_API_KEY"}>
-                  <i className="fas fa-paper-plane mr-2"></i> Send
-                </Button>
-              </form>
-            </Card>
-          )}
+                {generatedGuidance.motivationalSupport && (generatedGuidance.motivationalSupport.personalizedEncouragement || generatedGuidance.motivationalSupport.quote || generatedGuidance.motivationalSupport.nextStep) && (
+                    <Card className="bg-teal-50 border-l-4 border-teal-500">
+                        <h2 className="text-2xl font-semibold text-teal-700 mb-4">5️⃣ Motivational Support</h2>
+                        {generatedGuidance.motivationalSupport.personalizedEncouragement && <p className="text-lg text-teal-800 mb-3">🌟 {generatedGuidance.motivationalSupport.personalizedEncouragement}</p>}
+                        {generatedGuidance.motivationalSupport.quote && <p className="text-lg italic text-teal-800 mb-3">🌟 "{generatedGuidance.motivationalSupport.quote}"</p>}
+                        {generatedGuidance.motivationalSupport.nextStep && <p className="text-lg text-gray-700 mb-2">✅ <strong>Your Next Step:</strong> {generatedGuidance.motivationalSupport.nextStep}</p>}
+                        {generatedGuidance.motivationalSupport.reminder && <p className="text-md text-gray-600">🔁 {generatedGuidance.motivationalSupport.reminder}</p>}
+                    </Card>
+                )}
+            </div>
 
-          {generatedGuidance.rawResponse && generatedGuidance.rawResponse.includes("[Debug: Parsing resulted in empty or incomplete content based on structured checks.]") && (
-            <Card className="mt-6 border-amber-500 bg-amber-50">
-              <h3 className="text-lg font-semibold text-amber-700">Debugging Information:</h3>
-              <p className="text-sm text-amber-600 mb-2">The AI responded, but the application couldn't fully understand the structure of the plan. The raw response from the AI is shown below for technical review.</p>
-              <pre className="whitespace-pre-wrap text-xs bg-gray-100 p-2 rounded mt-2 max-h-96 overflow-y-auto">{generatedGuidance.rawResponse}</pre>
-            </Card>
-          )}
+            {/* Chat Section */}
+            {chat && (
+                <Card className="mt-8">
+                <h2 className="text-2xl font-semibold text-teal-700 mb-4 px-6">Talk to HerPath AI</h2>
+                <div ref={chatHistoryRef} className="h-96 overflow-y-auto mb-4 p-4 border-y border-gray-200 bg-gray-50 space-y-4">
+                    {chatHistory.map((msg, index) => (
+                    <div key={index} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+                        <div className={`max-w-xl p-3 rounded-xl shadow ${msg.sender === 'user' ? 'bg-teal-500 text-white' : 'bg-white text-gray-800'}`}>
+                        {msg.image && <img src={msg.image} alt="User upload" className="rounded-lg mb-2 max-w-xs" />}
+                        {msg.text && <p className="whitespace-pre-wrap">{msg.text}</p>}
+                        {msg.timestamp && <p className={`text-xs mt-1 ${msg.sender === 'user' ? 'text-teal-100 text-right' : 'text-gray-400 text-left'}`}>{msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>}
+                        </div>
+                    </div>
+                    ))}
+                    {isChatLoading && (
+                    <div className="flex justify-start">
+                        <div className="max-w-xl p-3 rounded-lg shadow bg-white text-gray-800">
+                        <i className="fas fa-spinner fa-spin mr-2"></i> {translate('aiTyping', 'AI is typing...')}
+                        </div>
+                    </div>
+                    )}
+                </div>
+                <ChatInput
+                    onSendMessage={handleChatSubmit}
+                    isLoading={isChatLoading}
+                    placeholder={translate('typeYourQuestion', 'Type your question here...')}
+                    apiKeyAvailable={!!apiKey && apiKey !== 'MISSING_API_KEY'}
+                />
+                </Card>
+            )}
+
+            {generatedGuidance.rawResponse && generatedGuidance.rawResponse.includes("[Debug: Parsing resulted in empty or incomplete content based on structured checks.]") && (
+                <Card className="mt-6 border-amber-500 bg-amber-50">
+                <h3 className="text-lg font-semibold text-amber-700">Debugging Information:</h3>
+                <p className="text-sm text-amber-600 mb-2">The application couldn't fully understand the structure of the plan. The raw response from the AI is shown below for technical review.</p>
+                <pre className="whitespace-pre-wrap text-xs bg-gray-100 p-2 rounded mt-2 max-h-96 overflow-y-auto">{generatedGuidance.rawResponse}</pre>
+                </Card>
+            )}
         </div>
       )}
     </div>

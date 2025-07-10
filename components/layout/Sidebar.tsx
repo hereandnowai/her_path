@@ -1,11 +1,14 @@
 
+
+
 import React from 'react';
-import * as ReactRouterDOM from 'react-router-dom';
-import { APP_ROUTES, NGO_NAME } from '../../constants';
+import { Link, NavLink, useNavigate } from 'react-router-dom';
+import { APP_ROUTES, APP_NAME } from '../../constants';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useAuth } from '../../contexts/AuthContext';
-import CreedLogo from '../common/CreedLogo';
+import HerPathLogo from '../common/HerPathLogo';
 import { Language } from '../../types';
+import Button from '../common/Button';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -15,7 +18,7 @@ interface SidebarProps {
 const NavItem: React.FC<{ to: string; icon: string; labelKey: string; onClick?: () => void }> = ({ to, icon, labelKey, onClick }) => {
   const { translate } = useLanguage();
   return (
-    <ReactRouterDOM.NavLink
+    <NavLink
       to={to}
       onClick={onClick}
       className={({ isActive }) =>
@@ -26,14 +29,21 @@ const NavItem: React.FC<{ to: string; icon: string; labelKey: string; onClick?: 
     >
       <i className={`fas ${icon} w-6 mr-3`}></i>
       {translate(labelKey)}
-    </ReactRouterDOM.NavLink>
+    </NavLink>
   );
 };
+
+const NavGroup: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
+  <div>
+    <h3 className="px-4 pt-4 pb-2 text-xs font-bold uppercase text-teal-200 tracking-wider">{title}</h3>
+    {children}
+  </div>
+);
 
 const Sidebar: React.FC<SidebarProps> = ({ isOpen, toggleSidebar }) => {
   const { translate, language, setLanguage } = useLanguage();
   const { logout, user } = useAuth();
-  const navigate = ReactRouterDOM.useNavigate();
+  const navigate = useNavigate();
 
   const handleLogout = () => {
     logout();
@@ -45,9 +55,6 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, toggleSidebar }) => {
 
   const handleLanguageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setLanguage(e.target.value as Language);
-     if (window.innerWidth < 768) { 
-        // toggleSidebar(); // Optional: close sidebar on mobile after language change
-    }
   };
   
   const handleNavItemClick = () => {
@@ -56,20 +63,35 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, toggleSidebar }) => {
     }
   }
 
+  const handleProfileClick = () => {
+    navigate(APP_ROUTES.PROFILE);
+    handleNavItemClick();
+  }
 
-  // Updated NavLinks structure
-  const navLinks = [
-    { to: APP_ROUTES.HOME, icon: 'fa-home', labelKey: 'home' },
-    { to: APP_ROUTES.SMART_PATHWAY, icon: 'fa-route', labelKey: 'smartPathway' },
-    { to: APP_ROUTES.WOMEN_AWARENESS, icon: 'fa-venus', labelKey: 'womenAwareness' }, // Age-specific awareness
-    { to: APP_ROUTES.WOMEN_LAW_AWARENESS, icon: 'fa-gavel', labelKey: 'womenLawAwarenessTitle' }, // New Law Awareness
-    { to: APP_ROUTES.AWARENESS_LIFE_SKILLS, icon: 'fa-lightbulb', labelKey: 'awarenessLifeSkills' },
-    { to: APP_ROUTES.LEARN_TO_USE_APPS, icon: 'fa-mobile-alt', labelKey: 'learnToUseApps' },
-    { to: APP_ROUTES.BRAIN_QUIZZES, icon: 'fa-brain', labelKey: 'brainQuizzes' },
-    { to: APP_ROUTES.EMERGENCY_CONTACTS, icon: 'fa-phone-alt', labelKey: 'emergencyContacts' },
-    { to: APP_ROUTES.SETTINGS, icon: 'fa-cog', labelKey: 'settings' },
-    { to: APP_ROUTES.HELP, icon: 'fa-question-circle', labelKey: 'helpSupport' },
-  ];
+  const navLinks = {
+      main: [
+        { to: APP_ROUTES.HOME, icon: 'fa-home', labelKey: 'home' },
+      ],
+      empowerment: [
+        { to: APP_ROUTES.SMART_PATHWAY, icon: 'fa-route', labelKey: 'smartPathway' },
+        { to: APP_ROUTES.DOCUMENT_PAL, icon: 'fa-file-alt', labelKey: 'documentPal' },
+      ],
+      learning: [
+        { to: APP_ROUTES.WOMEN_AWARENESS, icon: 'fa-venus', labelKey: 'womenAwareness' },
+        { to: APP_ROUTES.WOMEN_LAW_AWARENESS, icon: 'fa-gavel', labelKey: 'womenLawAwarenessTitle' },
+        { to: APP_ROUTES.AWARENESS_LIFE_SKILLS, icon: 'fa-lightbulb', labelKey: 'awarenessLifeSkills' },
+        { to: APP_ROUTES.LEARN_TO_USE_APPS, icon: 'fa-mobile-alt', labelKey: 'learnToUseApps' },
+      ],
+      engagement: [
+        { to: APP_ROUTES.SUCCESS_STORIES, icon: 'fa-star', labelKey: 'successStories' },
+        { to: APP_ROUTES.BRAIN_QUIZZES, icon: 'fa-brain', labelKey: 'brainQuizzes' },
+      ],
+      support: [
+        { to: APP_ROUTES.EMERGENCY_CONTACTS, icon: 'fa-phone-alt', labelKey: 'emergencyContacts' },
+        { to: APP_ROUTES.HELP, icon: 'fa-question-circle', labelKey: 'helpSupport' },
+        { to: APP_ROUTES.SETTINGS, icon: 'fa-cog', labelKey: 'settings' },
+      ]
+  };
 
   return (
     <>
@@ -88,10 +110,10 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, toggleSidebar }) => {
         aria-label="Main navigation"
       >
         <div className="flex items-center justify-between mb-2 md:justify-center">
-          <ReactRouterDOM.Link to={APP_ROUTES.HOME} className="flex items-center space-x-2" onClick={handleNavItemClick}>
-            <CreedLogo size={50} />
-            <span className="text-2xl font-bold">{translate('ngoName', NGO_NAME)}</span>
-          </ReactRouterDOM.Link>
+          <Link to={APP_ROUTES.HOME} className="flex items-center space-x-2" onClick={handleNavItemClick}>
+            <HerPathLogo size={50} />
+            <span className="text-2xl font-bold">{translate('appName', APP_NAME)}</span>
+          </Link>
           <button onClick={toggleSidebar} className="md:hidden text-white p-2 hover:bg-teal-700 rounded-md" aria-label="Close sidebar">
             <i className="fas fa-times text-2xl"></i>
           </button>
@@ -114,15 +136,31 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, toggleSidebar }) => {
         
         {user && (
           <div className="mb-4 p-3 bg-teal-700 rounded-lg text-center">
+            <img src={user.profilePictureUrl || `https://api.dicebear.com/8.x/initials/svg?seed=${encodeURIComponent(user.name)}`} alt="User profile" className="w-16 h-16 rounded-full mx-auto mb-2 border-2 border-teal-500" />
             <p className="font-semibold text-lg">{user.name}</p>
             <p className="text-sm text-teal-200">{user.email}</p>
+            <Button onClick={handleProfileClick} variant="link" size="sm" className="!text-white !hover:text-teal-200 mt-2">
+                {translate('profile')}
+            </Button>
           </div>
         )}
 
         <nav className="flex-grow overflow-y-auto space-y-1 pr-1 pb-2" role="navigation">
-          {navLinks.map(link => (
-            <NavItem key={link.to} {...link} onClick={handleNavItemClick} />
-          ))}
+           <NavGroup title="Main">
+             {navLinks.main.map(link => <NavItem key={link.to} {...link} onClick={handleNavItemClick} />)}
+           </NavGroup>
+           <NavGroup title="Empowerment Tools">
+             {navLinks.empowerment.map(link => <NavItem key={link.to} {...link} onClick={handleNavItemClick} />)}
+           </NavGroup>
+            <NavGroup title="Awareness & Learning">
+             {navLinks.learning.map(link => <NavItem key={link.to} {...link} onClick={handleNavItemClick} />)}
+           </NavGroup>
+            <NavGroup title="Engagement">
+             {navLinks.engagement.map(link => <NavItem key={link.to} {...link} onClick={handleNavItemClick} />)}
+           </NavGroup>
+            <NavGroup title="Support">
+             {navLinks.support.map(link => <NavItem key={link.to} {...link} onClick={handleNavItemClick} />)}
+           </NavGroup>
         </nav>
 
         <div className="mt-auto">

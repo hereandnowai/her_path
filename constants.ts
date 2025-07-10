@@ -1,42 +1,31 @@
-
 import { Language, Translations } from './types';
 
 export const APP_NAME = "HerPath";
 export const APP_TAGLINE = "Guiding Women Toward Brighter Futures";
-export const NGO_NAME = "CREED";
 
 export const APP_ROUTES = {
   WELCOME: '/',
   REGISTER: '/register',
   LOGIN: '/login',
   HOME: '/home',
-  // PROFILE: '/profile', // Removed, to be merged into Settings
+  PROFILE: '/profile', // New route for user profile
   SETTINGS: '/settings',
-  // EDUCATIONAL_RESOURCES: '/educational-resources', // Removed
   WOMEN_AWARENESS: '/women-awareness', // Existing women awareness (age-specific)
-  // SKILL_DEVELOPMENT: '/skill-development', // Removed
-  // FINANCIAL_LITERACY: '/financial-literacy', // Removed, merged into Skill Development
-  // SCHEMES_BENEFITS: '/schemes-benefits', // Removed, replaced by WOMEN_LAW_AWARENESS
-  WOMEN_LAW_AWARENESS: '/women-law-awareness', // New
-  // SCHOLARSHIPS_GRANTS: '/scholarships-grants', // Removed, merged into SCHEMES_BENEFITS
-  // HEALTH_WELLNESS: '/health-wellness', // Removed, merged into AWARENESS_LIFE_SKILLS
-  // JOB_OPPORTUNITIES: '/job-opportunities', // Removed
-  // MENTORSHIP_CONNECT: '/mentorship-connect', // Removed
-  BRAIN_QUIZZES: '/brain-quizzes', // New
-  // COMMUNITY_FORUM: '/community-forum', // Removed
+  WOMEN_LAW_AWARENESS: '/women-law-awareness',
+  BRAIN_QUIZZES: '/brain-quizzes',
   EMERGENCY_CONTACTS: '/emergency-contacts',
-  // MOTIVATIONAL_STORIES: '/success-stories', // Removed
   HELP: '/help',
-  SMART_PATHWAY: '/smart-pathway', // Was GUIDANCE_PATHWAY
+  SMART_PATHWAY: '/smart-pathway',
   AWARENESS_LIFE_SKILLS: '/awareness-life-skills', 
-  LEARN_TO_USE_APPS: '/learn-to-use-apps', 
+  LEARN_TO_USE_APPS: '/learn-to-use-apps',
+  SUCCESS_STORIES: '/success-stories', // New route for success stories
+  DOCUMENT_PAL: '/document-pal', // New feature
 };
 
 export const UI_TEXT: Translations = {
   // General
   appName: { [Language.EN]: APP_NAME, [Language.HI]: "हरपथ", [Language.TA]: "ஹர் பாத்" },
   appTagline: { [Language.EN]: APP_TAGLINE, [Language.HI]: "महिलाओं को उज्जवल भविष्य की ओर मार्गदर्शन", [Language.TA]: "பெண்களை பிரகாசமான எதிர்காலத்தை நோக்கி வழிநடத்துதல்" },
-  ngoName: { [Language.EN]: NGO_NAME, [Language.HI]: "क्रीड", [Language.TA]: "க்ரீட்" },
   loading: { [Language.EN]: "Loading...", [Language.HI]: "लोड हो रहा है...", [Language.TA]: "ஏற்றுகிறது..." },
   submit: { [Language.EN]: "Submit", [Language.HI]: "प्रस्तुत करें", [Language.TA]: "சமர்ப்பி" },
   save: { [Language.EN]: "Save", [Language.HI]: "सहेजें", [Language.TA]: "சேமி" },
@@ -50,28 +39,33 @@ export const UI_TEXT: Translations = {
   getStarted: { [Language.EN]: "Get Started", [Language.HI]: "शुरू करें", [Language.TA]: "தொடங்குங்கள்" },
   welcomeToHerPath: { [Language.EN]: `Welcome to ${APP_NAME}`, [Language.HI]: `हरपथ में आपका स्वागत है`, [Language.TA]: `${APP_NAME}க்கு வரவேற்கிறோம்` },
 
-  // Auth
+  // Auth & Profile
   register: { [Language.EN]: "Register", [Language.HI]: "पंजीकरण करें", [Language.TA]: "பதிவு செய்க" },
   login: { [Language.EN]: "Login", [Language.HI]: "लॉग इन करें", [Language.TA]: "உள்நுழை" },
   logout: { [Language.EN]: "Logout", [Language.HI]: "लॉग आउट", [Language.TA]: "வெளியேறு" },
   email: { [Language.EN]: "Email", [Language.HI]: "ईमेल", [Language.TA]: "மின்னஞ்சல்" },
   password: { [Language.EN]: "Password", [Language.HI]: "पासवर्ड", [Language.TA]: "கடவுச்சொல்" },
   name: { [Language.EN]: "Name", [Language.HI]: "नाम", [Language.TA]: "பெயர்" },
-  alreadyHaveAccount: { [Language.EN]: "Already have an account? Login", [Language.HI]: "पहले से ही खाता है? लॉग इन करें", [Language.TA]: "ஏற்கனவே கணக்கு உள்ளதா? உள்நுழையவும்" },
-  dontHaveAccount: { [Language.EN]: "Don't have an account? Register", [Language.HI]: "खाता नहीं है? पंजीकरण करें", [Language.TA]: "கணக்கு இல்லையா? பதிவு செய்யவும்" },
+  alreadyHaveAccount: { [Language.EN]: "Already have an account?", [Language.HI]: "पहले से ही खाता है?", [Language.TA]: "ஏற்கனவே கணக்கு உள்ளதா?" },
+  dontHaveAccount: { [Language.EN]: "Don't have an account?", [Language.HI]: "खाता नहीं है?", [Language.TA]: "கணக்கு இல்லையா?" },
+  profile: { [Language.EN]: "My Profile", [Language.HI]: "मेरी प्रोफाइल", [Language.TA]: "என் சுயவிவரம்" },
+  editProfile: { [Language.EN]: "Edit Profile", [Language.HI]: "प्रोफ़ाइल संपादित करें", [Language.TA]: "சுயவிவரத்தைத் திருத்து" },
+  profileUpdated: { [Language.EN]: "Profile updated successfully!", [Language.HI]: "प्रोफ़ाइल सफलतापूर्वक अपडेट की गई!", [Language.TA]: "சுயவிவரம் வெற்றிகரமாகப் புதுப்பிக்கப்பட்டது!" },
+  changePhoto: { [Language.EN]: "Change Photo", [Language.HI]: "फोटो बदलें", [Language.TA]: "புகைப்படத்தை மாற்று" },
 
   // Navigation / Titles
   home: { [Language.EN]: "Home", [Language.HI]: "होम", [Language.TA]: "முகப்பு" },
   settings: { [Language.EN]: "Settings", [Language.HI]: "सेटिंग्स", [Language.TA]: "அமைப்புகள்" },
-  womenAwareness: { [Language.EN]: "Women Awareness (Age-specific)", [Language.HI]: "महिला जागरूकता (आयु-विशिष्ट)", [Language.TA]: "பெண்கள் விழிப்புணர்வு (வயதுக்கு ஏற்ப)" }, // Clarified from generic womenAwareness
-  // schemesBenefits: { [Language.EN]: "Schemes & Govt. Benefits", [Language.HI]: "योजनाएं और सरकारी लाभ", [Language.TA]: "திட்டங்கள் மற்றும் அரசு நலன்கள்" }, // Removed
-  womenLawAwareness: { [Language.EN]: "Women Law Awareness (18+)", [Language.HI]: "महिला कानून जागरूकता (18+)", [Language.TA]: "பெண்கள் சட்ட விழிப்புணர்வு (18+)" }, // New
+  womenAwareness: { [Language.EN]: "Women Awareness (Age-specific)", [Language.HI]: "महिला जागरूकता (आयु-विशिष्ट)", [Language.TA]: "பெண்கள் விழிப்புணர்வு (வயதுக்கு ஏற்ப)" },
+  womenLawAwareness: { [Language.EN]: "Women Law Awareness (18+)", [Language.HI]: "महिला कानून जागरूकता (18+)", [Language.TA]: "பெண்கள் சட்ட விழிப்புணர்வு (18+)" },
   brainQuizzes: { [Language.EN]: "Brain Quizzes", [Language.HI]: "ब्रेन क्विज़", [Language.TA]: "மூளை வினாடி வினாக்கள்" },
   emergencyContacts: { [Language.EN]: "Emergency Contacts", [Language.HI]: "आपातकालीन संपर्क", [Language.TA]: "அவசர தொடர்புகள்" },
   helpSupport: { [Language.EN]: "Help & Support", [Language.HI]: "सहायता और समर्थन", [Language.TA]: "உதவி மற்றும் ஆதரவு" },
   smartPathway: { [Language.EN]: "Smart Pathway (Career + Education)", [Language.HI]: "स्मार्ट मार्ग (करियर + शिक्षा)", [Language.TA]: "ஸ்மார்ட் பாதை (தொழில் + கல்வி)" }, 
   awarenessLifeSkills: { [Language.EN]: "Awareness & Life Skills", [Language.HI]: "जागरूकता और जीवन कौशल", [Language.TA]: "விழிப்புணர்வு மற்றும் வாழ்க்கை திறன்கள்" },
-  
+  successStories: { [Language.EN]: "Success Stories", [Language.HI]: "सफलता की कहानियाँ", [Language.TA]: "வெற்றிக் கதைகள்" },
+  documentPal: { [Language.EN]: "Document Pal", [Language.HI]: "दस्तावेज़ पाल", [Language.TA]: "ஆவண நண்பன்" },
+
   // Learn to Use Apps
   learnToUseApps: { [Language.EN]: "Learn to Use Apps (Digital Help)", [Language.HI]: "ऐप्स का उपयोग करना सीखें (डिजिटल सहायता)", [Language.TA]: "செயலிகளைக் பயன்படுத்தக் கற்றுக்கொள்ளுங்கள் (டிஜிட்டல் உதவி)" },
   learnToUseAppsSubtitle: { [Language.EN]: "Discover apps and websites to achieve your goals.", [Language.HI]: "अपने लक्ष्यों को प्राप्त करने के लिए ऐप्स और वेबसाइटें खोजें।", [Language.TA]: "உங்கள் இலக்குகளை அடைய பயன்பாடுகள் மற்றும் வலைத்தளங்களைக் கண்டறியவும்." },
@@ -91,7 +85,7 @@ export const UI_TEXT: Translations = {
   readTextGuide: { [Language.EN]: "Read Text Guide", [Language.HI]: "पाठ गाइड पढ़ें", [Language.TA]: "உரை வழிகாட்டியைப் படியுங்கள்" },
   visitWebsite: { [Language.EN]: "Visit Website/App", [Language.HI]: "वेबसाइट/ऐप पर जाएं", [Language.TA]: "வலைத்தளம்/செயலியைப் பார்வையிடவும்" },
   chatWithAssistant: { [Language.EN]: "Chat with Assistant", [Language.HI]: "सहायक से चैट करें", [Language.TA]: "உதவியாளருடன் அரட்டையடிக்கவும்" },
-  askAboutApps: { [Language.EN]: "Ask questions about the recommended apps or how to use them.", [Language.HI]: "अनुशंसित ऐप्स या उनका उपयोग करने के तरीके के बारे में प्रश्न पूछें।", [Language.TA]: "பரிந்துரைக்கப்பட்ட பயன்பாடுகள் அல்லது அவற்றை எவ்வாறு பயன்படுத்துவது என்பது பற்றிய கேள்ிகளைக் கேளுங்கள்." },
+  askAboutApps: { [Language.EN]: "Ask questions about the recommended apps or how to use them.", [Language.HI]: "अनुशंसित ऐप्स या उनका उपयोग करने के तरीके के बारे में प्रश्न पूछें।", [Language.TA]: "பரிந்துரைக்கப்பட்ட பயன்பாடுகள் அல்லது அவற்றை எவ்வாறு பயன்படுத்துவது என்பது பற்றிய கேள்விகளைக் கேளுங்கள்." },
   askFollowUpQuestions: { [Language.EN]: "You can ask follow-up questions below.", [Language.HI]: "आप नीचे अनुवर्ती प्रश्न पूछ सकते हैं।", [Language.TA]: "நீங்கள் கீழே பின்தொடர் கேள்விகளைக் கேட்கலாம்." },
   aiTyping: { [Language.EN]: "Assistant is typing...", [Language.HI]: "सहायक टाइप कर रहा है...", [Language.TA]: "உதவியாளர் தட்டச்சு செய்கிறார்..." },
   typeYourQuestion: { [Language.EN]: "Type your question here...", [Language.HI]: "अपना प्रश्न यहाँ लिखें...", [Language.TA]: "உங்கள் கேள்வியை இங்கே தட்டச்சு செய்க..." },
@@ -121,6 +115,31 @@ export const UI_TEXT: Translations = {
   searchPlaceholder: { [Language.EN]: "Type to search...", [Language.HI]: "खोजने के लिए टाइप करें...", [Language.TA]: "தேட தட்டச்சு செய்க..." },
   featureComingSoon: { [Language.EN]: "feature is under development.", [Language.HI]: "सुविधा विकासधीन है।", [Language.TA]: "அம்சம் உருவாக்கத்தில் உள்ளது." },
   checkBackLater: { [Language.EN]: "Please check back later for updates.", [Language.HI]: "कृपया अपडेट के लिए बाद में जांचें।", [Language.TA]: "புதுப்பிப்புகளுக்கு பின்னர் சரிபார்க்கவும்." },
+  attachFile: { [Language.EN]: "Attach File", [Language.HI]: "फ़ाइल जोड़ें", [Language.TA]: "கோப்பை இணை" },
+  apiKeyMissingChat: { [Language.EN]: "API Key is missing. Chat is disabled.", [Language.HI]: "एपीआई कुंजी गायब है। चैट अक्षम है।", [Language.TA]: "API விசை இல்லை. அரட்டை முடக்கப்பட்டது." },
+  apiKeyMissingFeature: { [Language.EN]: "API Key is missing. This feature is disabled.", [Language.HI]: "एपीआई कुंजी गायब है। यह सुविधा अक्षम है।", [Language.TA]: "API விசை இல்லை. இந்த அம்சம் முடக்கப்பட்டுள்ளது." },
+
+  // Document Pal
+  documentPalTitle: { [Language.EN]: "Document Pal", [Language.HI]: "दस्तावेज़ पाल", [Language.TA]: "ஆவண நண்பன்" },
+  documentPalSubtitle: { [Language.EN]: "Get simple explanations for complex documents.", [Language.HI]: "जटिल दस्तावेज़ों के लिए सरल स्पष्टीकरण प्राप्त करें।", [Language.TA]: "சிக்கலான ஆவணங்களுக்கு எளிய விளக்கங்களைப் பெறுங்கள்." },
+  uploadInstruction: { [Language.EN]: "Upload a clear photo of your document.", [Language.HI]: "अपने दस्तावेज़ का एक स्पष्ट फ़ोटो अपलोड करें।", [Language.TA]: "உங்கள் ஆவணத்தின் தெளிவான புகைப்படத்தைப் பதிவேற்றவும்." },
+  selectFile: { [Language.EN]: "Select File", [Language.HI]: "फ़ाइल चुनें", [Language.TA]: "கோப்பைத் தேர்ந்தெடுக்கவும்" },
+  takePhoto: { [Language.EN]: "Take Photo", [Language.HI]: "फ़ोटो लें", [Language.TA]: "புகைப்படம் எடு" },
+  capture: { [Language.EN]: "Capture", [Language.HI]: "कैप्चर करें", [Language.TA]: "படம்பிடி" },
+  askAboutDocument: { [Language.EN]: "What do you want to know about this document? (Optional)", [Language.HI]: "आप इस दस्तावेज़ के बारे में क्या जानना चाहते हैं? (वैकल्पिक)", [Language.TA]: "இந்த ஆவணம் பற்றி நீங்கள் என்ன தெரிந்து கொள்ள விரும்புகிறீர்கள்? (விருப்பத்தேர்வு)" },
+  askAboutDocumentPlaceholder: { [Language.EN]: "e.g., Explain this in Tamil. Where do I sign?", [Language.HI]: "जैसे, इसे हिंदी में समझाएं। मुझे कहां हस्ताक्षर करना है?", [Language.TA]: "எ.கா., இதை தமிழில் விளக்கவும். நான் எங்கே கையெழுத்திட வேண்டும்?" },
+  getExplanation: { [Language.EN]: "Get Simple Explanation", [Language.HI]: "सरल स्पष्टीकरण प्राप्त करें", [Language.TA]: "எளிய விளக்கத்தைப் பெறுங்கள்" },
+  generatingExplanation: { [Language.EN]: "Analyzing your document...", [Language.HI]: "आपके दस्तावेज़ का विश्लेषण किया जा रहा है...", [Language.TA]: "உங்கள் ஆவணம் பகுப்பாய்வு செய்யப்படுகிறது..." },
+  explanationError: { [Language.EN]: "Sorry, I couldn't understand the document. Please try again with a clearer image.", [Language.HI]: "क्षमा करें, मैं दस्तावेज़ को समझ नहीं सका। कृपया एक स्पष्ट छवि के साथ पुनः प्रयास करें।", [Language.TA]: "மன்னிக்கவும், என்னால் ஆவணத்தைப் புரிந்து கொள்ள முடியவில்லை. தெளிவான படத்துடன் மீண்டும் முயற்சிக்கவும்." },
+  explanationParseError: { [Language.EN]: "Sorry, I had trouble understanding the AI's response. Please try again.", [Language.HI]: "क्षमा करें, मुझे AI की प्रतिक्रिया को समझने में समस्या हुई। कृपया पुनः प्रयास करें।", [Language.TA]: "மன்னிக்கவும், AI இன் பதிலைப் புரிந்துகொள்வதில் எனக்குச் சிக்கல் ஏற்பட்டது. மீண்டும் முயற்சிக்கவும்." },
+  documentExplanation: { [Language.EN]: "Your Document Explanation", [Language.HI]: "आपका दस्तावेज़ स्पष्टीकरण", [Language.TA]: "உங்கள் ஆவண விளக்கம்" },
+  summary: { [Language.EN]: "Summary", [Language.HI]: "सारांश", [Language.TA]: "சுருக்கம்" },
+  keyPoints: { [Language.EN]: "Key Points", [Language.HI]: "मुख्य बातें", [Language.TA]: "முக்கிய புள்ளிகள்" },
+  actionItems: { [Language.EN]: "Action Items", [Language.HI]: "कार्यवाही आइटम", [Language.TA]: "செயல் உருப்படிகள்" },
+  importantDates: { [Language.EN]: "Important Dates", [Language.HI]: "महत्वपूर्ण तिथियाँ", [Language.TA]: "முக்கிய தேதிகள்" },
+  disclaimer: { [Language.EN]: "Disclaimer", [Language.HI]: "अस्वीकरण", [Language.TA]: "பொறுப்புத் துறப்பு" },
+  changeDocument: { [Language.EN]: "Change Document", [Language.HI]: "दस्तावेज़ बदलें", [Language.TA]: "ஆவணத்தை மாற்று" },
+  startOver: { [Language.EN]: "Start Over", [Language.HI]: "पुनः आरंभ करें", [Language.TA]: "மீண்டும் தொடங்கு" },
 
   // Guidance Pathway Screen (now Smart Pathway)
   selectCategory: { [Language.EN]: "Select Your Category", [Language.HI]: "अपनी श्रेणी चुनें", [Language.TA]: "உங்கள் வகையைத் தேர்ந்தெடுக்கவும்" },
@@ -239,6 +258,29 @@ export const UI_TEXT: Translations = {
 
   faqQ6Title: { [Language.EN]: "Where can I find emergency contact numbers?", [Language.HI]: "मुझे आपातकालीन संपर्क नंबर कहां मिल सकते हैं?", [Language.TA]: "அவசர தொடர்பு எண்களை நான் எங்கே காணலாம்?" },
   faqQ6Answer: { [Language.EN]: "Tap on 'Emergency Contacts' in the sidebar menu. This section lists important helpline numbers like Police (100), Women Helpline (1091), Ambulance (102), and Child Helpline (1098). You can tap the 'Call' button next to a number to initiate a call (this is a simulation in the current app).", [Language.HI]: "साइडबार मेनू में 'आपातकालीन संपर्क' पर टैप करें। यह अनुभाग पुलिस (100), महिला हेल्पलाइन (1091), एम्बुलेंस (102), और चाइल्ड हेल्पलाइन (1098) जैसे महत्वपूर्ण हेल्पलाइन नंबरों को सूचीबद्ध करता है। कॉल शुरू करने के लिए आप किसी नंबर के आगे 'कॉल' बटन पर टैप कर सकते हैं (यह वर्तमान ऐप में एक सिमुलेशन है)।", [Language.TA]: "பக்கப்பட்டி மெனுவில் 'அவசர தொடர்புகள்' என்பதைத் தட்டவும். இந்தப் பிரிவு காவல்துறை (100), பெண்கள் உதவி எண் (1091), ஆம்புலன்ஸ் (102), மற்றும் குழந்தை உதவி எண் (1098) போன்ற முக்கியமான உதவி எண்களை பட்டியலிடுகிறது. அழைப்பைத் தொடங்க ஒரு எண்ணுக்கு அடுத்துள்ள 'அழை' பொத்தானைத் தட்டலாம் (இது தற்போதைய செயலியில் ஒரு உருவகப்படுத்துதலாகும்)." },
+  
+  // Success Stories
+  successStoriesTitle: { [Language.EN]: "Success Stories", [Language.HI]: "सफलता की कहानियाँ", [Language.TA]: "வெற்றிக் கதைகள்" },
+  successStoriesSubtitle: { [Language.EN]: "Be inspired by stories of strength and achievement.", [Language.HI]: "शक्ति और उपलब्धि की कहानियों से प्रेरित हों।", [Language.TA]: "வலிமை மற்றும் சாதனைகளின் கதைகளால் ஈர்க்கப்படுங்கள்." },
+  getInspiration: { [Language.EN]: "Get a New Inspiring Story", [Language.HI]: "एक नई प्रेरक कहानी प्राप्त करें", [Language.TA]: "ஒரு புதிய எழுச்சியூட்டும் கதையைப் பெறுங்கள்" },
+  generatingStory: { [Language.EN]: "Finding an inspiring story for you...", [Language.HI]: "आपके लिए एक प्रेरक कहानी ढूंढ रहा हूँ...", [Language.TA]: "உங்களுக்காக ஒரு எழுச்சியூட்டும் கதையைக் கண்டறிகிறேன்..." },
+  storyError: { [Language.EN]: "Could not find a story at this time. Please try again.", [Language.HI]: "इस समय कोई कहानी नहीं मिली। कृपया पुनः प्रयास करें।", [Language.TA]: "இந்த நேரத்தில் ஒரு கதையைக் கண்டுபிடிக்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்." },
+
+  // Emergency Contacts
+  addContact: { [Language.EN]: "Add Personal Contact", [Language.HI]: "व्यक्तिगत संपर्क जोड़ें", [Language.TA]: "தனிப்பட்ட தொடர்பைச் சேர்" },
+  relationship: { [Language.EN]: "Relationship", [Language.HI]: "रिश्ता", [Language.TA]: "உறவு" },
+  phoneNumber: { [Language.EN]: "Phone Number", [Language.HI]: "फ़ोन नंबर", [Language.TA]: "தொலைபேசி எண்" },
+  personalContacts: { [Language.EN]: "Your Personal Contacts", [Language.HI]: "आपके व्यक्तिगत संपर्क", [Language.TA]: "உங்கள் தனிப்பட்ட தொடர்புகள்" },
+  nationalHelplines: { [Language.EN]: "National Helplines", [Language.HI]: "राष्ट्रीय हेल्पलाइन", [Language.TA]: "தேசிய உதவி எண்கள்" },
+  noPersonalContacts: { [Language.EN]: "You haven't added any personal contacts yet.", [Language.HI]: "आपने अभी तक कोई व्यक्तिगत संपर्क नहीं जोड़ा है।", [Language.TA]: "நீங்கள் இன்னும் தனிப்பட்ட தொடர்புகள் எதையும் சேர்க்கவில்லை." },
+  deleteContact: { [Language.EN]: "Delete", [Language.HI]: "हटाएं", [Language.TA]: "நீக்கு" },
+  confirmDeleteContact: { [Language.EN]: "Are you sure you want to delete this contact?", [Language.HI]: "क्या आप वाकई इस संपर्क को हटाना चाहते हैं?", [Language.TA]: "இந்தத் தொடர்பை நீக்க விரும்புகிறீர்களா?" },
+
+  // App Helper
+  appHelperTitle: { [Language.EN]: "HerPath Helper", [Language.HI]: "हरपथ हेल्पर", [Language.TA]: "ஹெர்பாத் ஹெல்பர்" },
+  appHelperWelcome: { [Language.EN]: "Hello! I'm your HerPath Helper ❤️. How can I help you explore the app today? You can ask me things like 'How do I use Smart Pathway?' or 'What is Document Pal?'", [Language.HI]: "नमस्ते! मैं आपकी हरपथ हेल्पर हूँ ❤️। आज मैं ऐप को एक्सप्लोर करने में आपकी कैसे मदद कर सकती हूँ? आप मुझसे 'स्मार्ट पाथवे का उपयोग कैसे करें?' या 'डॉक्यूमेंट पाल क्या है?' जैसे सवाल पूछ सकती हैं।", [Language.TA]: "வணக்கம்! நான் உங்கள் ஹெர்பாத் ஹெல்பர் ❤️. செயலியை ஆராய்வதில் இன்று நான் உங்களுக்கு எப்படி உதவ முடியும்? 'ஸ்மார்ட் பாதையை எப்படி பயன்படுத்துவது?' அல்லது 'ஆவண நண்பன் என்றால் என்ன?' போன்ற கேள்விகளை நீங்கள் என்னிடம் கேட்கலாம்." },
+  appHelperPlaceholder: { [Language.EN]: "Ask about app features...", [Language.HI]: "ऐप की विशेषताओं के बारे में पूछें...", [Language.TA]: "பயன்பாட்டின் அம்சங்களைப் பற்றிக் கேளுங்கள்..." },
+
 };
 
 export const PRIMARY_COLOR = 'teal-600'; // Tailwind CSS class

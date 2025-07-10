@@ -9,12 +9,12 @@ interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
   hoverEffect?: boolean;
 }
 
-const Card: React.FC<CardProps> = ({ children, className = '', title, onClick, hoverEffect = false, ...rest }) => {
+const Card = React.forwardRef<HTMLDivElement, CardProps>(({ children, className = '', title, onClick, hoverEffect = false, ...rest }, ref) => {
   const baseStyle = `bg-white shadow-lg rounded-xl overflow-hidden ${onClick ? 'cursor-pointer' : ''}`;
   const hoverStyle = hoverEffect ? 'transition-all duration-300 ease-in-out hover:shadow-xl hover:scale-105' : '';
   
   return (
-    <div className={`${baseStyle} ${hoverStyle} ${className}`} onClick={onClick} {...rest}>
+    <div ref={ref} className={`${baseStyle} ${hoverStyle} ${className}`} onClick={onClick} {...rest}>
       {title && (
         <div className="px-6 py-4 border-b border-gray-200">
           <h3 className="text-xl font-semibold text-teal-700">{title}</h3>
@@ -25,6 +25,8 @@ const Card: React.FC<CardProps> = ({ children, className = '', title, onClick, h
       </div>
     </div>
   );
-};
+});
+
+Card.displayName = 'Card';
 
 export default Card;

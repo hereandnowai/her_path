@@ -1,13 +1,27 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { GoogleGenAI, GenerateContentResponse, Chat } from "@google/genai"; // Added Chat
+import { GoogleGenAI, GenerateContentResponse, Chat, Part } from "@google/genai";
 import { useLanguage } from '../../contexts/LanguageContext';
-import { Language, AwarenessPoint, ChatMessage } from '../../types'; // Added ChatMessage
+import { Language, AwarenessPoint, ChatMessage } from '../../types';
 import SectionTitle from '../../components/common/SectionTitle';
 import Input from '../../components/common/Input';
 import Button from '../../components/common/Button';
 import Card from '../../components/common/Card';
 import AwarenessPointCard from '../../components/awareness/AwarenessPointCard';
+import ChatInput from '../../components/common/ChatInput';
+import { usePdfDownloader } from '../../hooks/usePdfDownloader.ts';
+import DownloadButton from '../../components/common/DownloadButton.tsx';
+
+const fileToGenerativePart = async (file: File) => {
+    const base64EncodedDataPromise = new Promise<string>((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
+      reader.readAsDataURL(file);
+    });
+    return {
+      inlineData: { data: await base64EncodedDataPromise, mimeType: file.type },
+    };
+};
 
 const WomenAwarenessScreenComponent: React.FC = () => {
   const { translate, language } = useLanguage();
@@ -15,14 +29,20 @@ const WomenAwarenessScreenComponent: React.FC = () => {
   const [awarenessPoints, setAwarenessPoints] = useState<AwarenessPoint[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [rawAwarenessResponse, setRawAwarenessResponse] = useState<string | null>(null); // To store raw AI response for chat context
+  const [rawAwarenessResponse, setRawAwarenessResponse] = useState<string | null>(null);
 
   // Chat state
   const [chatSession, setChatSession] = useState<Chat | null>(null);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
-  const [chatInput, setChatInput] = useState('');
   const [isChatAssistantLoading, setIsChatAssistantLoading] = useState(false);
   const chatContainerRef = useRef<HTMLDivElement>(null);
+  
+  const awarenessPointsRef = useRef<HTMLDivElement>(null);
+  const { downloadPdf, isDownloading } = usePdfDownloader();
+
+  const handleDownload = () => {
+    downloadPdf(awarenessPointsRef.current, `HerPath_Awareness_Tips_Age_${age}`);
+  };
 
 
   const apiKey = process.env.API_KEY;
@@ -44,6 +64,13 @@ const WomenAwarenessScreenComponent: React.FC = () => {
       const match = jsonStr.match(fenceRegex);
       if (match && match[1]) {
         jsonStr = match[1].trim();
+      }
+      
+      // Robustness: Find the start and end of the JSON array to remove any leading/trailing text.
+      const startIndex = jsonStr.indexOf('[');
+      const endIndex = jsonStr.lastIndexOf(']');
+      if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
+        jsonStr = jsonStr.substring(startIndex, endIndex + 1);
       }
       
       const parsedData = JSON.parse(jsonStr);
@@ -86,6 +113,7 @@ Based on the user's age, generate a list of at least 20 distinct awareness point
 3.  "imageSuggestion": (string) A brief textual description of a simple, positive, and culturally appropriate image that could visually illustrate the "awarenessText". This image should be easy to understand.
 
 Output ONLY the JSON array of these objects. Do NOT include any text, greetings, or explanations before or after the JSON array. Do NOT use markdown code fences.
+IMPORTANT: The string values within the JSON must be simple natural language. Do not include technical jargon, programming code, HTML, or CSS.
 
 Detailed Age Group Guidelines:
 - Age 0-3 (Guidance for Parents/Caregivers): Focus on basic health, safety, early development cues, nutrition, hygiene. Phrase for caregiver.
@@ -234,18 +262,32 @@ Remember: Your purpose is to be a source of comfort, understanding, and gentle g
     }
   };
 
-  const handleChatSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!chatInput.trim() || !chatSession || isChatAssistantLoading) return;
+  const handleChatSubmit = async (message: { text: string; file: File | null }) => {
+    if (!chatSession || isChatAssistantLoading) return;
 
-    const userMessage: ChatMessage = { sender: 'user', text: chatInput, timestamp: new Date() };
+    const { text, file } = message;
+    if (!text.trim() && !file) return;
+
+    let imagePreviewUrl: string | undefined = undefined;
+    if (file && file.type.startsWith("image/")) {
+      imagePreviewUrl = URL.createObjectURL(file);
+    }
+    
+    const userMessage: ChatMessage = { sender: 'user', text, timestamp: new Date(), image: imagePreviewUrl };
     setChatMessages(prev => [...prev, userMessage]);
-    const currentChatInput = chatInput;
-    setChatInput('');
     setIsChatAssistantLoading(true);
 
     try {
-      const response = await chatSession.sendMessage({message: currentChatInput});
+      const messageParts: Part[] = [];
+      if (text.trim()) {
+        messageParts.push({ text: text.trim() });
+      }
+      if (file) {
+        const filePart = await fileToGenerativePart(file);
+        messageParts.push(filePart);
+      }
+      
+      const response = await chatSession.sendMessage({message: messageParts});
       const aiMessageText = response.text;
 
       if (aiMessageText) {
@@ -323,13 +365,18 @@ Remember: Your purpose is to be a source of comfort, understanding, and gentle g
 
       {!isLoading && !error && awarenessPoints.length > 0 && (
         <div className="mb-8">
-          <h2 className="text-2xl font-semibold text-gray-800 mb-6">
-            {translate('awarenessPointsForAge')} {age}
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {awarenessPoints.map((point) => (
-              <AwarenessPointCard key={point.id} point={point} />
-            ))}
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-semibold text-gray-800">
+                {translate('awarenessPointsForAge')} {age}
+            </h2>
+            <DownloadButton onClick={handleDownload} isLoading={isDownloading} className="!mt-0" />
+          </div>
+          <div ref={awarenessPointsRef} className="p-4 bg-white rounded-lg">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {awarenessPoints.map((point) => (
+                <AwarenessPointCard key={point.id} point={point} />
+                ))}
+            </div>
           </div>
         </div>
       )}
@@ -358,7 +405,8 @@ Remember: Your purpose is to be a source of comfort, understanding, and gentle g
                         msg.sender === 'user' ? 'bg-rose-500 text-white' : 'bg-rose-100 text-rose-800'
                     }`}
                 >
-                  <p className="whitespace-pre-wrap text-sm">{msg.text}</p>
+                  {msg.image && <img src={msg.image} alt="User upload" className="rounded-lg mb-2 max-w-xs" />}
+                  {msg.text && <p className="whitespace-pre-wrap text-sm">{msg.text}</p>}
                   {msg.timestamp && (
                     <p className={`text-xs mt-1 ${msg.sender === 'user' ? 'text-rose-100 text-right' : 'text-rose-400 text-left'}`}>
                       {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -376,28 +424,12 @@ Remember: Your purpose is to be a source of comfort, understanding, and gentle g
               </div>
             )}
           </div>
-          <form onSubmit={handleChatSubmit} className="flex gap-3 p-4 pt-0">
-            <Input
-              type="text"
-              value={chatInput}
-              onChange={(e) => setChatInput(e.target.value)}
+          <ChatInput
+              onSendMessage={handleChatSubmit}
+              isLoading={isChatAssistantLoading}
               placeholder={translate('awarenessChatPlaceholder')}
-              className="flex-grow !mb-0 text-sm"
-              wrapperClassName="flex-grow !mb-0"
-              disabled={isChatAssistantLoading || isLoading || !apiKey || apiKey === "MISSING_API_KEY"}
-              aria-label={translate('awarenessChatPlaceholder')}
-            />
-            <Button 
-                type="submit" 
-                disabled={isChatAssistantLoading || isLoading || !chatInput.trim() || !apiKey || apiKey === "MISSING_API_KEY"}
-                aria-label={translate('send')}
-                className="px-4 bg-rose-600 hover:bg-rose-700 focus:ring-rose-500"
-            >
-              <i className="fas fa-paper-plane"></i>
-              <span className="sr-only">{translate('send')}</span>
-            </Button>
-          </form>
-           {(!apiKey || apiKey === "MISSING_API_KEY") && <p role="alert" className="text-red-500 text-xs text-center pb-2 px-4">API Key is missing. Chat assistant is disabled.</p>}
+              apiKeyAvailable={!!apiKey && apiKey !== 'MISSING_API_KEY'}
+          />
         </Card>
       )}
     </div>

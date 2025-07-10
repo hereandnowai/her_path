@@ -1,7 +1,10 @@
 
+
+
 import React, { useState, ReactNode } from 'react';
 import Header from './Header';
 import Sidebar from './Sidebar.tsx'; // Added .tsx extension
+import AppHelper from '../common/AppHelper.tsx';
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -15,7 +18,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   };
 
   return (
-    <div className="flex h-screen bg-[#FFF1F5]">
+    <div className="flex h-full bg-[#FFF1F5]">
       <Sidebar isOpen={isSidebarOpen} toggleSidebar={toggleSidebar} />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header toggleSidebar={toggleSidebar} />
@@ -31,6 +34,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
             */}
         </main>
       </div>
+      <AppHelper />
     </div>
   );
 };

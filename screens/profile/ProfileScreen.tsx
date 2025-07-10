@@ -8,49 +8,69 @@ import Card from '../../components/common/Card';
 import SectionTitle from '../../components/common/SectionTitle';
 import { User } from '../../types';
 
-const ProfileScreen: React.FC = () => {
-  const { user, login: updateUserAuth } = useAuth(); // login also updates user in context
+export const ProfileScreen: React.FC = () => {
+  const { user, updateUserProfile } = useAuth();
   const { translate } = useLanguage();
   
   const [name, setName] = useState(user?.name || '');
   const [email, setEmail] = useState(user?.email || '');
-  const [profilePicture, setProfilePicture] = useState<File | null>(null);
-  const [profilePictureUrl, setProfilePictureUrl] = useState(user?.profilePictureUrl || 'https://picsum.photos/200'); // Placeholder
+  const [phoneNumber, setPhoneNumber] = useState(user?.phoneNumber || '');
+  const [profilePictureFile, setProfilePictureFile] = useState<File | null>(null);
+  const [profilePictureUrl, setProfilePictureUrl] = useState(user?.profilePictureUrl || `https://api.dicebear.com/8.x/initials/svg?seed=${encodeURIComponent(user?.name || 'User')}`);
   const [isEditing, setIsEditing] = useState(false);
   const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
 
   useEffect(() => {
     if (user) {
       setName(user.name);
       setEmail(user.email);
-      setProfilePictureUrl(user.profilePictureUrl || 'https://picsum.photos/200');
+      setPhoneNumber(user.phoneNumber || '');
+      setProfilePictureUrl(user.profilePictureUrl || `https://api.dicebear.com/8.x/initials/svg?seed=${encodeURIComponent(user.name)}`);
     }
   }, [user]);
 
   const handlePictureChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      setProfilePicture(file);
+      setProfilePictureFile(file);
       setProfilePictureUrl(URL.createObjectURL(file)); // Preview image
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
 
-    // Simulate update
-    const updatedUserData: User = {
-      ...user,
-      name,
-      email,
-      profilePictureUrl: profilePicture ? profilePictureUrl : user.profilePictureUrl // Keep old if no new one
-    };
-    
-    updateUserAuth(updatedUserData); // This will update context and localStorage
-    setMessage('Profile updated successfully!');
-    setIsEditing(false);
-    setTimeout(() => setMessage(''), 3000);
+    setMessage('');
+    setError('');
+
+    if (phoneNumber && !/^\+?[0-9\s-]{10,15}$/.test(phoneNumber)) {
+        setError("Please enter a valid phone number.");
+        return;
+    }
+
+    try {
+      const updatedUserData: Partial<User> = {
+        name,
+        email,
+        phoneNumber,
+        // The `profilePictureUrl` from the component's state is the source of truth for the UI.
+        // It holds either the original URL, a new temporary blob URL, or the DiceBear fallback URL.
+        // It is initialized to never be undefined, so it's safe to use for the update.
+        profilePictureUrl: profilePictureUrl
+      };
+      
+      await updateUserProfile(updatedUserData);
+      
+      setMessage(translate('profileUpdated'));
+      setIsEditing(false);
+      setProfilePictureFile(null); // Clear file input state after update
+      setTimeout(() => setMessage(''), 3000);
+    } catch (err: any) {
+       console.error("Failed to update profile", err);
+       setError(`Failed to save changes. Please try again. ${err.message || ''}`);
+    }
   };
 
   if (!user) {
@@ -61,19 +81,20 @@ const ProfileScreen: React.FC = () => {
     <div className="max-w-4xl mx-auto">
       <SectionTitle title={translate('profile')} />
       {message && <div className="mb-4 p-3 bg-green-100 text-green-700 rounded-md">{message}</div>}
+      {error && <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md">{error}</div>}
       
       <Card>
         <div className="flex flex-col md:flex-row items-center md:items-start space-y-6 md:space-y-0 md:space-x-8">
-          <div className="flex-shrink-0">
+          <div className="flex-shrink-0 text-center">
             <img 
               src={profilePictureUrl} 
               alt="Profile" 
-              className="w-40 h-40 rounded-full object-cover shadow-lg"
+              className="w-40 h-40 rounded-full object-cover shadow-lg mx-auto"
             />
             {isEditing && (
               <div className="mt-4">
-                <label htmlFor="profilePictureInput" className="cursor-pointer bg-teal-500 text-white px-4 py-2 rounded-lg hover:bg-teal-600 text-sm block text-center">
-                  Change Photo
+                <label htmlFor="profilePictureInput" className="cursor-pointer bg-teal-500 text-white px-4 py-2 rounded-lg hover:bg-teal-600 text-sm block">
+                  {translate('changePhoto')}
                 </label>
                 <input 
                   type="file" 
@@ -86,7 +107,7 @@ const ProfileScreen: React.FC = () => {
             )}
           </div>
 
-          <div className="flex-grow">
+          <div className="flex-grow w-full">
             {!isEditing ? (
               <div className="space-y-4">
                 <div>
@@ -97,8 +118,13 @@ const ProfileScreen: React.FC = () => {
                   <label className="block text-sm font-medium text-gray-500">{translate('email')}</label>
                   <p className="text-xl text-gray-800">{user.email}</p>
                 </div>
-                {/* Add more profile fields here */}
-                <Button onClick={() => setIsEditing(true)} className="mt-4">Edit Profile</Button>
+                 <div>
+                  <label className="block text-sm font-medium text-gray-500">{translate('phoneNumber')}</label>
+                  <p className="text-xl text-gray-800">{user.phoneNumber || 'Not provided'}</p>
+                </div>
+                <Button onClick={() => setIsEditing(true)} className="mt-4" leftIcon={<i className="fas fa-edit"></i>}>
+                  {translate('editProfile')}
+                </Button>
               </div>
             ) : (
               <form onSubmit={handleSubmit} className="space-y-6">
@@ -118,10 +144,17 @@ const ProfileScreen: React.FC = () => {
                   onChange={(e) => setEmail(e.target.value)}
                   required
                 />
-                {/* Add more editable fields */}
+                <Input
+                  id="phoneNumber"
+                  label={translate('phoneNumber')}
+                  type="tel"
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  placeholder="Your mobile number (optional)"
+                />
                 <div className="flex space-x-4 mt-6">
-                  <Button type="submit">{translate('save')}</Button>
-                  <Button type="button" variant="secondary" onClick={() => { setIsEditing(false); setMessage(''); }}>
+                  <Button type="submit" leftIcon={<i className="fas fa-save"></i>}>{translate('save')}</Button>
+                  <Button type="button" variant="secondary" onClick={() => { setIsEditing(false); setMessage(''); setError(''); }}>
                     {translate('cancel')}
                   </Button>
                 </div>
@@ -130,25 +163,6 @@ const ProfileScreen: React.FC = () => {
           </div>
         </div>
       </Card>
-
-      {/* Placeholder for Document Upload section removed
-      <div className="mt-8">
-        <Card title={translate('uploadDocument')}>
-            <p className="text-gray-600 mb-4">Upload important documents like certificates, ID proofs, etc. (Max 5MB per file)</p>
-            <Input 
-              type="file" 
-              id="documentUpload" 
-              label="Select Document" 
-              className="text-lg"
-              // Add onChange handler to manage uploaded files
-            />
-            <Button className="mt-2">Upload</Button>
-            <p className="mt-2 text-sm text-gray-500">Supported formats: PDF, JPG, PNG.</p>
-        </Card>
-      </div>
-      */}
     </div>
   );
 };
-
-export default ProfileScreen;

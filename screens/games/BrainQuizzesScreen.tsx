@@ -1,412 +1,377 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+
+import React, { useState, useCallback, useRef } from 'react';
+import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import { useLanguage } from '../../contexts/LanguageContext';
-import { QuizQuestion, QuizAnswerOption } from '../../types';
+import { QuizQuestion, QuizAnswerOption, Language } from '../../types';
 import SectionTitle from '../../components/common/SectionTitle';
 import Button from '../../components/common/Button';
 import Card from '../../components/common/Card';
+import { usePdfDownloader } from '../../hooks/usePdfDownloader.ts';
+import DownloadButton from '../../components/common/DownloadButton.tsx';
 
-const SEEN_QUESTIONS_STORAGE_KEY = 'herPathSeenQuizQuestions';
-const QUESTIONS_PER_BATCH = 5;
+const QUESTIONS_PER_LEVEL = 5;
+// As per user request, perfect score is required to advance.
+const PASSING_SCORE = 5; 
 
-const allMockQuestions: QuizQuestion[] = [
-  // General Knowledge
-  {
-    id: 'gk1',
-    questionText: 'What is the capital of India?',
-    options: [ { text: 'Mumbai', isCorrect: false }, { text: 'New Delhi', isCorrect: true }, { text: 'Kolkata', isCorrect: false }, { text: 'Chennai', isCorrect: false } ],
-    category: 'General Knowledge', difficulty: 'easy', explanation: 'New Delhi is the capital of India.'
-  },
-  {
-    id: 'gk2',
-    questionText: 'Which is the longest river in India?',
-    options: [ { text: 'Godavari', isCorrect: false }, { text: 'Ganges (Ganga)', isCorrect: true }, { text: 'Yamuna', isCorrect: false }, { text: 'Brahmaputra', isCorrect: false } ],
-    category: 'General Knowledge', difficulty: 'medium', explanation: 'The Ganges (Ganga) is the longest river in India.'
-  },
-  {
-    id: 'gk3',
-    questionText: 'Who is known as the "Father of the Nation" in India?',
-    options: [ { text: 'Jawaharlal Nehru', isCorrect: false }, { text: 'Sardar Patel', isCorrect: false }, { text: 'Mahatma Gandhi', isCorrect: true }, { text: 'B.R. Ambedkar', isCorrect: false } ],
-    category: 'General Knowledge', difficulty: 'easy', explanation: 'Mahatma Gandhi is known as the Father of the Nation in India.'
-  },
-  {
-    id: 'gk4',
-    questionText: 'How many states are there in India (as of 2023)?',
-    options: [ { text: '28', isCorrect: true }, { text: '29', isCorrect: false }, { text: '30', isCorrect: false }, { text: '27', isCorrect: false } ],
-    category: 'General Knowledge', difficulty: 'medium', explanation: 'India has 28 states and 8 Union Territories.'
-  },
-  {
-    id: 'gk5',
-    questionText: 'What is the national animal of India?',
-    options: [ { text: 'Lion', isCorrect: false }, { text: 'Tiger', isCorrect: true }, { text: 'Elephant', isCorrect: false }, { text: 'Leopard', isCorrect: false } ],
-    category: 'General Knowledge', difficulty: 'easy', explanation: 'The Royal Bengal Tiger is the national animal of India.'
-  },
-
-  // Logic
-  {
-    id: 'logic1',
-    questionText: 'Which number comes next in the series: 2, 4, 6, 8, __?',
-    options: [ { text: '9', isCorrect: false }, { text: '10', isCorrect: true }, { text: '12', isCorrect: false }, { text: '7', isCorrect: false } ],
-    category: 'Logic', difficulty: 'easy', explanation: 'The series increases by 2 each time. So, 8 + 2 = 10.'
-  },
-  {
-    id: 'logic2',
-    questionText: 'If all Bloops are Razzies and all Razzies are Lazzies, are all Bloops definitely Lazzies?',
-    options: [ { text: 'Yes', isCorrect: true }, { text: 'No', isCorrect: false }, { text: 'Maybe', isCorrect: false }, { text: 'Not enough information', isCorrect: false } ],
-    category: 'Logic', difficulty: 'medium', explanation: 'This is a transitive property. If A=B and B=C, then A=C.'
-  },
-  {
-    id: 'logic3',
-    questionText: 'A B C D E. Which letter is two to the right of the letter immediately to the left of D?',
-    options: [ { text: 'C', isCorrect: false }, { text: 'D', isCorrect: false }, { text: 'E', isCorrect: true }, { text: 'B', isCorrect: false } ],
-    category: 'Logic', difficulty: 'medium', explanation: 'Letter to the left of D is C. Two letters to the right of C is E.'
-  },
-  {
-    id: 'logic4',
-    questionText: 'A mother is twice as old as her daughter. If the mother is 40, how old is the daughter?',
-    options: [ { text: '10', isCorrect: false }, { text: '20', isCorrect: true }, { text: '30', isCorrect: false }, { text: '15', isCorrect: false } ],
-    category: 'Logic', difficulty: 'easy', explanation: 'If the mother is twice as old, the daughter is half her age. 40 / 2 = 20.'
-  },
-  {
-    id: 'logic5',
-    questionText: 'Which shape usually has the most sides: Triangle, Square, Pentagon, Hexagon?',
-    options: [ { text: 'Triangle (3)', isCorrect: false }, { text: 'Square (4)', isCorrect: false }, { text: 'Pentagon (5)', isCorrect: false }, { text: 'Hexagon (6)', isCorrect: true } ],
-    category: 'Logic', difficulty: 'easy', explanation: 'A hexagon has 6 sides, which is more than a triangle (3), square (4), or pentagon (5).'
-  },
-  
-  // Math
-  {
-    id: 'math1',
-    questionText: 'What is 5 + 7?',
-    options: [ { text: '10', isCorrect: false }, { text: '12', isCorrect: true }, { text: '11', isCorrect: false }, { text: '13', isCorrect: false } ],
-    category: 'Math', difficulty: 'easy', explanation: '5 + 7 equals 12.'
-  },
-  {
-    id: 'math2',
-    questionText: 'How many sides does a triangle have?',
-    options: [ { text: 'Three', isCorrect: true }, { text: 'Four', isCorrect: false }, { text: 'Five', isCorrect: false }, { text: 'Six', isCorrect: false } ],
-    category: 'Math', difficulty: 'easy', explanation: 'A triangle is a polygon with three edges and three vertices.'
-  },
-  {
-    id: 'math3',
-    questionText: 'What is 2 + 2 * 2?',
-    options: [ { text: '8', isCorrect: false }, { text: '6', isCorrect: true }, { text: '4', isCorrect: false }, { text: '10', isCorrect: false } ],
-    category: 'Math', difficulty: 'medium', explanation: 'Order of operations (multiplication first): 2 * 2 = 4, then 2 + 4 = 6.'
-  },
-  {
-    id: 'math4',
-    questionText: 'If you have 3 apples and you give away 1, how many do you have left?',
-    options: [ { text: '1', isCorrect: false }, { text: '2', isCorrect: true }, { text: '3', isCorrect: false }, { text: '0', isCorrect: false } ],
-    category: 'Math', difficulty: 'easy', explanation: '3 - 1 = 2.'
-  },
-  {
-    id: 'math5',
-    questionText: 'What is 10 divided by 2?',
-    options: [ { text: '2', isCorrect: false }, { text: '5', isCorrect: true }, { text: '8', isCorrect: false }, { text: '4', isCorrect: false } ],
-    category: 'Math', difficulty: 'easy', explanation: '10 / 2 = 5.'
-  },
-
-  // Basic Science
-  {
-    id: 'sci1',
-    questionText: 'What do plants need to grow, apart from water and soil?',
-    options: [ { text: 'Moonlight', isCorrect: false }, { text: 'Sunlight', isCorrect: true }, { text: 'Electricity', isCorrect: false }, { text: 'Wind', isCorrect: false } ],
-    category: 'Basic Science', difficulty: 'easy', explanation: 'Plants use sunlight for photosynthesis to make their food.'
-  },
-  {
-    id: 'sci2',
-    questionText: 'What is H2O commonly known as?',
-    options: [ { text: 'Salt', isCorrect: false }, { text: 'Sugar', isCorrect: false }, { text: 'Water', isCorrect: true }, { text: 'Air', isCorrect: false } ],
-    category: 'Basic Science', difficulty: 'easy', explanation: 'H2O is the chemical formula for water.'
-  },
-  {
-    id: 'sci3',
-    questionText: 'Which planet is known as the Red Planet?',
-    options: [ { text: 'Jupiter', isCorrect: false }, { text: 'Mars', isCorrect: true }, { text: 'Venus', isCorrect: false }, { text: 'Saturn', isCorrect: false } ],
-    category: 'Basic Science', difficulty: 'medium', explanation: 'Mars is called the Red Planet due to its reddish appearance from iron oxide on its surface.'
-  },
-  {
-    id: 'sci4',
-    questionText: 'What pulls objects towards the Earth?',
-    options: [ { text: 'Magnetism', isCorrect: false }, { text: 'Gravity', isCorrect: true }, { text: 'Friction', isCorrect: false }, { text: 'Wind', isCorrect: false } ],
-    category: 'Basic Science', difficulty: 'easy', explanation: 'Gravity is the force that attracts objects with mass towards each other, like Earth pulling objects down.'
-  },
-  {
-    id: 'sci5',
-    questionText: 'How many colors are in a rainbow typically?',
-    options: [ { text: '5', isCorrect: false }, { text: '7', isCorrect: true }, { text: '9', isCorrect: false }, { text: '3', isCorrect: false } ],
-    category: 'Basic Science', difficulty: 'easy', explanation: 'A rainbow is typically described as having 7 colors: Red, Orange, Yellow, Green, Blue, Indigo, Violet (ROYGBIV).'
-  },
-  
-  // Digital Literacy (Simple)
-  {
-    id: 'digi1',
-    questionText: 'What is a common symbol for "Search" on websites and apps?',
-    options: [ { text: 'A house icon', isCorrect: false }, { text: 'A magnifying glass icon', isCorrect: true }, { text: 'A gear icon', isCorrect: false }, { text: 'A heart icon', isCorrect: false } ],
-    category: 'Digital Literacy', difficulty: 'easy', explanation: 'A magnifying glass (🔍) is widely used to represent search functionality.'
-  },
-  {
-    id: 'digi2',
-    questionText: 'If you receive an email from an unknown person asking for your bank password, what should you do?',
-    options: [ { text: 'Reply with your password', isCorrect: false }, { text: 'Ignore or delete the email', isCorrect: true }, { text: 'Click on any links in the email', isCorrect: false }, { text: 'Call them back', isCorrect: false } ],
-    category: 'Digital Literacy', difficulty: 'easy', explanation: 'Never share your passwords. Suspicious emails asking for personal info should be ignored or deleted.'
-  },
-  {
-    id: 'digi3',
-    questionText: 'What does "Wi-Fi" help you do?',
-    options: [ { text: 'Make phone calls without a SIM card', isCorrect: false }, { text: 'Connect to the internet without wires', isCorrect: true }, { text: 'Charge your phone faster', isCorrect: false }, { text: 'Increase phone storage', isCorrect: false } ],
-    category: 'Digital Literacy', difficulty: 'easy', explanation: 'Wi-Fi allows devices to connect to the internet wirelessly.'
-  },
-  {
-    id: 'digi4',
-    questionText: 'Which of these is a popular app for sending messages?',
-    options: [ { text: 'Calculator', isCorrect: false }, { text: 'WhatsApp', isCorrect: true }, { text: 'Calendar', isCorrect: false }, { text: 'Gallery', isCorrect: false } ],
-    category: 'Digital Literacy', difficulty: 'easy', explanation: 'WhatsApp is a widely used messaging application.'
-  },
-  {
-    id: 'digi5',
-    questionText: 'To turn off a computer, you usually click on:',
-    options: [ { text: 'Open a new file', isCorrect: false }, { text: 'Shut Down or Turn Off option', isCorrect: true }, { text: 'Increase volume', isCorrect: false }, { text: 'Change wallpaper', isCorrect: false } ],
-    category: 'Digital Literacy', difficulty: 'easy', explanation: 'Operating systems provide a "Shut Down" or "Turn Off" option to safely power down the computer.'
-  },
+// As per user request, expanded to 20 levels.
+const LEVEL_NAMES = [
+  "Beginner", "Novice", "Rookie", "Apprentice", "Adept",
+  "Skilled", "Proficient", "Expert", "Veteran", "Master",
+  "Grandmaster", "Champion", "Legend", "Mythic", "Sage",
+  "Oracle", "Prodigy", "Savant", "Genius", "Ultimate"
 ];
 
+const quizCategories = [
+  { id: 'general_knowledge_india', name: 'General Knowledge (India)', icon: 'fa-globe-asia' },
+  { id: 'indian_history', name: 'Indian History', icon: 'fa-landmark' },
+  { id: 'science_technology', name: 'Science & Technology', icon: 'fa-flask' },
+  { id: 'logic_reasoning', name: 'Logic & Reasoning', icon: 'fa-brain' },
+  { id: 'mathematics', name: 'Mathematics', icon: 'fa-calculator' },
+  { id: 'english_grammar', name: 'English Grammar', icon: 'fa-spell-check' },
+  { id: 'world_geography', name: 'World Geography', icon: 'fa-map' },
+  { id: 'current_affairs', name: 'Current Affairs', icon: 'fa-newspaper' },
+];
 
 const BrainQuizzesScreen: React.FC = () => {
-  const { translate } = useLanguage();
-  
-  const [currentBatchQuestions, setCurrentBatchQuestions] = useState<QuizQuestion[]>([]);
+  const { translate, language } = useLanguage();
+
+  const [gameState, setGameState] = useState<'selecting_category' | 'generating' | 'playing' | 'level_complete'>('selecting_category');
+  const [selectedCategory, setSelectedCategory] = useState<{id: string, name: string} | null>(null);
+  const [currentLevelIndex, setCurrentLevelIndex] = useState(0);
+  const [questions, setQuestions] = useState<QuizQuestion[]>([]);
+  // New state to track all questions asked in the current session for uniqueness.
+  const [sessionQuestionsHistory, setSessionQuestionsHistory] = useState<QuizQuestion[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [levelScore, setLevelScore] = useState(0);
+  const [totalScore, setTotalScore] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<QuizAnswerOption | null>(null);
-  const [score, setScore] = useState(0);
-  const [quizState, setQuizState] = useState<'not_started' | 'playing' | 'answered' | 'finished_batch' | 'all_finished'>('not_started');
-  const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
-  const [allQuestionsAttempted, setAllQuestionsAttempted] = useState(false);
-
-
-  const loadSeenQuestionIds = useCallback((): string[] => {
-    const seenIds = localStorage.getItem(SEEN_QUESTIONS_STORAGE_KEY);
-    return seenIds ? JSON.parse(seenIds) : [];
-  }, []);
-
-  const saveSeenQuestionId = useCallback((id: string) => {
-    const seenIds = loadSeenQuestionIds();
-    if (!seenIds.includes(id)) {
-      seenIds.push(id);
-      localStorage.setItem(SEEN_QUESTIONS_STORAGE_KEY, JSON.stringify(seenIds));
-    }
-  }, [loadSeenQuestionIds]);
+  const [isAnswered, setIsAnswered] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   
-  const getNewBatch = useCallback((): QuizQuestion[] => {
-    const seenIds = loadSeenQuestionIds();
-    const unseenQuestions = allMockQuestions.filter(q => !seenIds.includes(q.id));
-    
-    if (unseenQuestions.length === 0) {
-      setAllQuestionsAttempted(true);
-      return [];
+  const resultsRef = useRef<HTMLDivElement>(null);
+  const { downloadPdf, isDownloading } = usePdfDownloader();
+
+  const apiKey = process.env.API_KEY;
+  const ai = new GoogleGenAI({ apiKey: apiKey || "MISSING_API_KEY" });
+  
+  const handleDownloadResults = () => {
+    downloadPdf(resultsRef.current, `HerPath_Quiz_Results_${selectedCategory?.name.replace(/\s/g, '_')}_Level_${LEVEL_NAMES[currentLevelIndex]}`);
+  };
+
+  const parseQuizQuestions = (responseText: string): QuizQuestion[] | null => {
+    try {
+        let jsonStr = responseText.trim();
+        const fenceRegex = /^```(?:json)?\s*\n?(.*?)\n?\s*```$/s;
+        const match = jsonStr.match(fenceRegex);
+        if (match && match[1]) {
+            jsonStr = match[1].trim();
+        }
+        
+        const parsedData = JSON.parse(jsonStr);
+
+        if (Array.isArray(parsedData) && parsedData.length > 0) {
+            const firstItem = parsedData[0];
+            if (firstItem.questionText && Array.isArray(firstItem.options) && firstItem.options.length > 0) {
+                return parsedData;
+            }
+        }
+        console.warn('Parsed JSON data is not a valid quiz question array:', parsedData);
+        return null;
+    } catch (e) {
+        console.error('Failed to parse JSON response for quiz questions:', e, "\nRaw Text:", responseText);
+        return null;
+    }
+  };
+
+  const fetchAndStartLevel = useCallback(async (category: {id: string, name: string}, questionHistory: QuizQuestion[]) => {
+    if (!apiKey || apiKey === "MISSING_API_KEY") {
+        setError("API Key is missing. Cannot generate a quiz.");
+        setGameState('selecting_category');
+        return;
     }
     
-    // Shuffle unseen questions and take a batch
-    const shuffled = unseenQuestions.sort(() => 0.5 - Math.random());
-    return shuffled.slice(0, QUESTIONS_PER_BATCH);
-  }, [loadSeenQuestionIds]);
+    setGameState('generating');
+    setError(null);
+    setQuestions([]);
 
+    const difficulty = LEVEL_NAMES[currentLevelIndex];
+    const languageName = language === Language.HI ? 'Hindi' : (language === Language.TA ? 'Tamil' : 'English');
+    const previouslyAskedQuestionsText = questionHistory.map(q => `- ${q.questionText}`).join('\n');
 
-  const handleStartQuiz = useCallback(() => {
-    const newBatch = getNewBatch();
-    if (newBatch.length > 0) {
-      setCurrentBatchQuestions(newBatch);
-      setCurrentQuestionIndex(0);
-      setScore(0);
-      setSelectedAnswer(null);
-      setFeedbackMessage(null);
-      setQuizState('playing');
-      setAllQuestionsAttempted(false); // Reset this flag for a new batch
-    } else {
-      // This case means all questions from allMockQuestions have been seen
-      setAllQuestionsAttempted(true);
-      setQuizState('all_finished'); // A new state to indicate all questions exhausted
+    const systemInstruction = `
+You are an expert-level, highly precise Quiz Generator AI. Your ONLY function is to generate flawless JSON.
+Your task is to create quiz questions based on a given category, language, and difficulty. The questions must be engaging, clear, and accurate.
+
+Category: ${category.name}
+Language: ${languageName}
+Number of Questions to Generate: ${QUESTIONS_PER_LEVEL}
+Difficulty Level: ${difficulty}
+
+You MUST provide the output as a single, valid JSON array. Each object in the array represents one quiz question and MUST have the following exact keys and value types. Adhere to the schema precisely.
+
+{
+  "id": "string",
+  "questionText": "string",
+  "options": [
+    { "text": "string", "isCorrect": "boolean" },
+    { "text": "string", "isCorrect": "boolean" },
+    { "text": "string", "isCorrect": "boolean" },
+    { "text": "string", "isCorrect": "boolean" }
+  ],
+  "category": "string",
+  "difficulty": "string (The difficulty MUST match '${difficulty}')",
+  "explanation": "string (A brief explanation for the correct answer)"
+}
+
+CRITICAL RULES FOR OUTPUT:
+1.  **JSON ONLY**: The entire response MUST be a single, valid JSON array. Nothing else. No introductory text, no explanations, no apologies, no markdown fences (like \`\`\`json). Just the raw JSON array.
+2.  **VALID SYNTAX**: Ensure all brackets \`[]\`, braces \`{}\`, quotes \`""\`, and commas \`,\` are perfectly placed. There must be no trailing commas.
+3.  **NO EXTRA TEXT**: Absolutely NO unquoted text, comments, or random words should appear inside or outside the JSON structure.
+4.  **LANGUAGE**: All string values (questionText, option text, category, explanation) MUST be in the requested language: ${languageName}.
+5.  **CORRECT OPTION**: For every question, EXACTLY one option object must have \`"isCorrect": true\`. The other three MUST have \`"isCorrect": false\`.
+6.  **UNIQUE QUESTIONS**: It is critical that you generate completely new questions. DO NOT REPEAT any of the questions from the following list of previously asked questions in this session:
+${previouslyAskedQuestionsText || "No questions have been asked yet."}
+    `;
+
+    try {
+        const response: GenerateContentResponse = await ai.models.generateContent({
+            model: 'gemini-2.5-flash-preview-04-17',
+            contents: `Generate ${QUESTIONS_PER_LEVEL} quiz questions.`, // The main details are in the system instruction
+            config: {
+                systemInstruction: systemInstruction,
+                responseMimeType: "application/json",
+                temperature: 0.3,
+            }
+        });
+
+        const responseText = response.text;
+        const parsedQuestions = parseQuizQuestions(responseText);
+
+        if (parsedQuestions && parsedQuestions.length > 0) {
+            setQuestions(parsedQuestions);
+            // Add the newly fetched questions to the session history
+            setSessionQuestionsHistory(prevHistory => [...prevHistory, ...parsedQuestions]);
+            setCurrentQuestionIndex(0);
+            setLevelScore(0);
+            setSelectedAnswer(null);
+            setIsAnswered(false);
+            setGameState('playing');
+        } else {
+            setError("Could not generate a valid quiz. The AI's response was not in the expected format. Please try again.");
+            setGameState('selecting_category');
+        }
+    } catch (apiError: any) {
+        console.error("Gemini API error (Quiz Generation):", apiError);
+        setError(`Failed to generate quiz due to an API error: ${apiError.message || 'Unknown error'}. Please try again later.`);
+        setGameState('selecting_category');
     }
-  }, [getNewBatch]);
+  }, [language, apiKey, currentLevelIndex]);
 
-  useEffect(() => {
-    if (quizState === 'not_started') {
-       // Optionally, one could pre-load or check available questions here.
-       // For now, starting is explicit via button.
-    }
-  }, [quizState, handleStartQuiz]);
+  const handleCategorySelect = (category: {id: string, name: string}) => {
+    setSelectedCategory(category);
+    setCurrentLevelIndex(0);
+    setTotalScore(0);
+    // Reset session history for a new game
+    setSessionQuestionsHistory([]);
+    fetchAndStartLevel(category, []); // Start with an empty history
+  };
 
   const handleAnswerSelect = (option: QuizAnswerOption) => {
-    if (quizState === 'playing') {
+    if (!isAnswered) {
       setSelectedAnswer(option);
     }
   };
-  
+
   const handleSubmitAnswer = () => {
     if (!selectedAnswer) return;
 
+    setIsAnswered(true);
     if (selectedAnswer.isCorrect) {
-      setScore(prevScore => prevScore + 1);
-      setFeedbackMessage(translate('correctAnswer'));
-    } else {
-      setFeedbackMessage(translate('incorrectAnswer'));
+      setLevelScore(prev => prev + 1);
+      setTotalScore(prev => prev + 1);
     }
-    // Mark as seen after answering, regardless of correctness
-    saveSeenQuestionId(currentBatchQuestions[currentQuestionIndex].id);
-    setQuizState('answered');
   };
 
   const handleNextQuestion = () => {
+    setIsAnswered(false);
     setSelectedAnswer(null);
-    setFeedbackMessage(null);
-    if (currentQuestionIndex < currentBatchQuestions.length - 1) {
+    if (currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex(prevIndex => prevIndex + 1);
-      setQuizState('playing');
     } else {
-      setQuizState('finished_batch');
+      setGameState('level_complete');
     }
   };
-
-  const handleRestartAllQuizzes = () => {
-    localStorage.removeItem(SEEN_QUESTIONS_STORAGE_KEY);
-    setAllQuestionsAttempted(false);
-    handleStartQuiz();
-  };
-
-
-  if (quizState === 'not_started') {
-    return (
-      <div className="text-center">
-        <SectionTitle title={translate('brainQuizzesTitle')} subtitle={translate('brainQuizzesSubtitle')} />
-        <Button onClick={handleStartQuiz} size="lg" className="mt-8">
-          <i className="fas fa-play mr-2"></i> {translate('startQuiz')}
-        </Button>
-      </div>
-    );
-  }
-
-  if (quizState === 'finished_batch' || quizState === 'all_finished') {
-    const canLoadMore = !allQuestionsAttempted && getNewBatch().length > 0; // Check if more unique questions exist overall
-
-    return (
-      <div className="text-center max-w-lg mx-auto">
-        <SectionTitle title={translate('quizCompleted')} /> {/* Could be "Batch Completed" */}
-        <Card className="mt-8 p-8 bg-teal-50">
-          <p className="text-2xl text-gray-700 mb-4">
-            {translate('yourScore')} (this batch): <span className="font-bold text-teal-600 text-3xl">{score} / {currentBatchQuestions.length}</span>
-          </p>
-          
-          {allQuestionsAttempted && quizState === 'all_finished' && (
-            <p className="text-lg text-blue-600 my-4">
-              You've attempted all available unique questions! Great job!
-            </p>
-          )}
-
-          {canLoadMore && quizState === 'finished_batch' && !allQuestionsAttempted && (
-            <Button onClick={handleStartQuiz} size="lg" className="mt-6 mb-3">
-             <i className="fas fa-arrow-right mr-2"></i> Next Batch ({QUESTIONS_PER_BATCH} Questions)
-            </Button>
-          )}
-          
-          <Button onClick={handleRestartAllQuizzes} variant="secondary" size="lg" className="mt-2">
-           <i className="fas fa-redo mr-2"></i> Restart All Quizzes
-          </Button>
-        </Card>
-      </div>
-    );
-  }
   
-  if (currentBatchQuestions.length === 0) {
-    // This handles the case where startQuiz was called but no questions could be loaded (e.g., all seen)
-    // or if quizState is 'playing'/'answered' but batch is empty (inconsistent state).
-    // Given the logic, if getNewBatch() returns empty, quizState becomes 'all_finished',
-    // which is handled by the block above. So this primarily acts as a safeguard.
-    return (
-       <div className="text-center max-w-lg mx-auto">
-        <SectionTitle title={translate('brainQuizzesTitle')} />
-        <Card className="mt-8 p-8 bg-amber-50">
-          <p className="text-2xl text-gray-700 mb-4">
-             No new quizzes available at the moment.
-          </p>
-           <p className="text-lg text-gray-600 mb-6">
-            You've attempted all unique questions!
-          </p>
-          <Button onClick={handleRestartAllQuizzes} size="lg" className="mt-6">
-           <i className="fas fa-redo mr-2"></i> Restart All Quizzes
-          </Button>
-        </Card>
-      </div>
-    );
+  const handleNextLevel = () => {
+      // Pass the current session history to fetchAndStartLevel
+      if (currentLevelIndex < LEVEL_NAMES.length - 1 && selectedCategory) {
+          const nextLevelIndex = currentLevelIndex + 1;
+          setCurrentLevelIndex(nextLevelIndex);
+          fetchAndStartLevel(selectedCategory, sessionQuestionsHistory);
+      } else {
+          handlePlayAgain();
+      }
   }
 
-  const currentQuestion = currentBatchQuestions[currentQuestionIndex];
-  if (!currentQuestion) { // Should ideally not happen if logic is correct
-      return (
-          <div className="text-center p-8">
-              <p className="text-gray-700">Error: Could not load question. Please try restarting the quiz.</p>
-              <Button onClick={handleRestartAllQuizzes} className="mt-4">Restart</Button>
-          </div>
-      );
+  const handlePlayAgain = () => {
+      setGameState('selecting_category');
+      setError(null);
+      setSelectedCategory(null);
+      setCurrentLevelIndex(0);
+      setTotalScore(0);
+      setLevelScore(0);
+      setSessionQuestionsHistory([]); // Clear history on play again
   }
 
+  const renderContent = () => {
+    switch(gameState) {
+        case 'generating':
+            return (
+                <div className="text-center p-10">
+                    <i className="fas fa-spinner fa-spin text-5xl text-teal-600 mb-4"></i>
+                    <p className="text-xl text-gray-700">Generating your quiz for level: <span className="font-bold capitalize">{LEVEL_NAMES[currentLevelIndex]}</span></p>
+                </div>
+            );
+            
+        case 'selecting_category':
+             return (
+                <div className="text-center">
+                    <SectionTitle title={translate('brainQuizzesTitle')} subtitle="Choose a category to start your challenge!" />
+                     {error && (
+                        <div className="my-4 p-3 bg-red-100 text-red-700 rounded-md max-w-2xl mx-auto">
+                            <strong>Error:</strong> {error}
+                        </div>
+                    )}
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mt-8 max-w-4xl mx-auto">
+                       {quizCategories.map(category => (
+                           <Card 
+                             key={category.id} 
+                             onClick={() => handleCategorySelect(category)} 
+                             hoverEffect
+                             className="text-center p-6 bg-teal-50"
+                           >
+                                <i className={`fas ${category.icon} text-4xl mb-3 text-teal-600`}></i>
+                                <span className="font-semibold text-gray-700">{category.name}</span>
+                           </Card>
+                       ))}
+                    </div>
+                </div>
+            );
 
-  return (
-    <div className="max-w-2xl mx-auto">
-      <SectionTitle title={translate('brainQuizzesTitle')} />
-      <Card className="p-6 md:p-8 shadow-xl">
-        <div className="mb-6">
-          <h2 className="text-xl font-semibold text-gray-700 mb-1">
-            {translate('question')} {currentQuestionIndex + 1} {translate('of')} {currentBatchQuestions.length}
-          </h2>
-          <p className="text-2xl text-gray-800 leading-relaxed">{currentQuestion.questionText}</p>
-          {currentQuestion.category && <p className="text-sm text-gray-500 mt-1">Category: {currentQuestion.category}</p>}
-        </div>
+        case 'level_complete':
+            const passedLevel = levelScore >= PASSING_SCORE;
+            const isLastLevel = currentLevelIndex === LEVEL_NAMES.length - 1;
+            
+            return (
+                <div className="text-center max-w-lg mx-auto">
+                    <div ref={resultsRef} className="p-4 bg-white rounded-xl">
+                        <SectionTitle 
+                            title={passedLevel ? `Level ${LEVEL_NAMES[currentLevelIndex]} Complete!` : `Level ${LEVEL_NAMES[currentLevelIndex]} Failed`}
+                            subtitle={passedLevel ? "Perfect score! Ready for the next challenge?" : "Don't worry, you need a perfect score to advance. You can try again!"}
+                        />
+                        <Card className="mt-8 p-8 bg-teal-50">
+                          <p className="text-xl text-gray-700 mb-2">
+                            Level Score: <span className="font-bold text-teal-600 text-2xl">{levelScore} / {QUESTIONS_PER_LEVEL}</span>
+                          </p>
+                           <p className="text-xl text-gray-700 mb-4">
+                            Total Score: <span className="font-bold text-teal-600 text-2xl">{totalScore}</span>
+                          </p>
+                        </Card>
+                    </div>
+                    
+                    <div className="mt-6 flex flex-wrap justify-center items-center gap-4">
+                        {passedLevel && !isLastLevel && (
+                            <Button onClick={handleNextLevel} size="lg">
+                                <i className="fas fa-arrow-right mr-2"></i> Next Level: {LEVEL_NAMES[currentLevelIndex + 1]}
+                            </Button>
+                        )}
+                        {passedLevel && isLastLevel && (
+                            <p className="font-bold text-green-600 text-2xl w-full">Congratulations! You have completed all levels!</p>
+                        )}
 
-        <div className="space-y-3 mb-6">
-          {currentQuestion.options.map((option, index) => (
-            <Button
-              key={index}
-              onClick={() => handleAnswerSelect(option)}
-              fullWidth
-              variant={'secondary'} // Base variant
-              className={`text-left justify-start p-4 text-lg transition-colors duration-150 ease-in-out
-                ${selectedAnswer === option ? 'ring-2 ring-teal-500 bg-teal-100 border-teal-500' : 'border-gray-300 hover:bg-gray-100'}
-                ${quizState === 'answered' && option.isCorrect ? '!bg-green-500 hover:!bg-green-600 border-green-700 !text-white ring-green-500' : ''}
-                ${quizState === 'answered' && selectedAnswer === option && !option.isCorrect ? '!bg-red-500 hover:!bg-red-600 border-red-700 !text-white ring-red-500' : ''}
-              `}
-              disabled={quizState === 'answered'}
-              aria-pressed={selectedAnswer === option}
-            >
-              {option.text}
-            </Button>
-          ))}
-        </div>
+                        <Button onClick={handlePlayAgain} size="lg" variant={passedLevel ? 'secondary' : 'primary'}>
+                            <i className="fas fa-redo mr-2"></i> {translate('playAgain')}
+                        </Button>
+                        <DownloadButton onClick={handleDownloadResults} isLoading={isDownloading} className="!mt-0" />
+                    </div>
+                </div>
+            );
 
-        {feedbackMessage && (
-          <div className={`p-3 rounded-md text-center my-4 text-lg font-semibold ${selectedAnswer?.isCorrect ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-            {feedbackMessage}
-          </div>
-        )}
-        
-        {quizState === 'answered' && currentQuestion.explanation && (
-           <div className="p-3 rounded-md bg-blue-50 text-blue-700 my-4 text-sm">
-            <strong>{translate('quizExplanation')}:</strong> {currentQuestion.explanation}
-          </div>
-        )}
+        case 'playing':
+            const currentQuestion = questions[currentQuestionIndex];
+            if (!currentQuestion) {
+                 return (
+                    <div className="text-center p-8">
+                        <p className="text-gray-700">Error: Could not load question. Please try again.</p>
+                        <Button onClick={handlePlayAgain} className="mt-4">Play Again</Button>
+                    </div>
+                );
+            }
+            return (
+                <div className="max-w-2xl mx-auto">
+                  <SectionTitle title={`${selectedCategory?.name} - Level ${LEVEL_NAMES[currentLevelIndex]}`} />
+                  <Card className="p-6 md:p-8 shadow-xl">
+                    <div className="mb-6">
+                      <h2 className="text-xl font-semibold text-gray-700 mb-1">
+                        {translate('question')} {currentQuestionIndex + 1} {translate('of')} {questions.length}
+                      </h2>
+                      <p className="text-2xl text-gray-800 leading-relaxed">{currentQuestion.questionText}</p>
+                      <p className="text-sm text-gray-500 mt-1 capitalize">Difficulty: {currentQuestion.difficulty}</p>
+                    </div>
 
-        {quizState === 'playing' && (
-          <Button onClick={handleSubmitAnswer} size="lg" fullWidth disabled={!selectedAnswer}>
-            {translate('submitAnswer')}
-          </Button>
-        )}
-        {quizState === 'answered' && (
-           <Button onClick={handleNextQuestion} size="lg" fullWidth>
-            {currentQuestionIndex < currentBatchQuestions.length - 1 ? translate('nextQuestion') : translate('quizCompleted')} {/* Text could be "View Results" */}
-          </Button>
-        )}
-      </Card>
-    </div>
-  );
+                    <div className="space-y-3 mb-6">
+                      {currentQuestion.options.map((option, index) => (
+                        <Button
+                          key={index}
+                          onClick={() => handleAnswerSelect(option)}
+                          fullWidth
+                          variant={'secondary'}
+                          className={`text-left justify-start p-4 text-lg transition-colors duration-150 ease-in-out
+                            ${selectedAnswer === option && !isAnswered ? 'ring-2 ring-teal-500 bg-teal-100 border-teal-500' : 'border-gray-300 hover:bg-gray-100'}
+                            ${isAnswered && option.isCorrect ? '!bg-green-500 hover:!bg-green-600 border-green-700 !text-white ring-green-500' : ''}
+                            ${isAnswered && selectedAnswer === option && !option.isCorrect ? '!bg-red-500 hover:!bg-red-600 border-red-700 !text-white ring-red-500' : ''}
+                          `}
+                          disabled={isAnswered}
+                          aria-pressed={selectedAnswer === option}
+                        >
+                          {option.text}
+                        </Button>
+                      ))}
+                    </div>
+
+                    {isAnswered && (
+                      <div className={`p-3 rounded-md text-center my-4 text-lg font-semibold ${selectedAnswer?.isCorrect ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                        {selectedAnswer?.isCorrect ? translate('correctAnswer') : translate('incorrectAnswer')}
+                      </div>
+                    )}
+                    
+                    {isAnswered && currentQuestion.explanation && (
+                       <div className="p-4 rounded-md bg-blue-50 text-blue-800 my-4 text-base border border-blue-200">
+                        <strong className="flex items-center"><i className="fas fa-lightbulb mr-2 text-blue-500"></i>{translate('quizExplanation')}:</strong> 
+                        <p className="mt-1 pl-1">{currentQuestion.explanation}</p>
+                      </div>
+                    )}
+
+                    {!isAnswered && (
+                      <Button onClick={handleSubmitAnswer} size="lg" fullWidth disabled={!selectedAnswer}>
+                        {translate('submitAnswer')}
+                      </Button>
+                    )}
+                    {isAnswered && (
+                       <Button onClick={handleNextQuestion} size="lg" fullWidth>
+                        {currentQuestionIndex < questions.length - 1 ? translate('nextQuestion') : 'Finish Level'}
+                      </Button>
+                    )}
+                  </Card>
+                </div>
+            );
+        default:
+            return <p>Something went wrong.</p>;
+    }
+  }
+
+  return <div>{renderContent()}</div>;
 };
 
 export default BrainQuizzesScreen;

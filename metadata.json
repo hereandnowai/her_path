@@ -1,6 +1,9 @@
 {
   "name": "her_path",
   "description": "A real-time portal for women empowerment and student welfare, guiding underprivileged women and female students toward brighter futures. Developed for CREED NGO.",
-  "requestFramePermissions": [],
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ],
   "prompt": ""
 }

@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { AppRecommendation, Language } from '../../types';
 import Card from '../common/Card';
@@ -12,24 +11,6 @@ interface AppRecommendationCardProps {
 const AppRecommendationCard: React.FC<AppRecommendationCardProps> = ({ recommendation }) => {
   const { translate } = useLanguage();
 
-  const getYouTubeEmbedUrl = (videoUrl: string): string | null => {
-    try {
-      const url = new URL(videoUrl);
-      let videoId = null;
-      if (url.hostname === 'www.youtube.com' || url.hostname === 'youtube.com') {
-        videoId = url.searchParams.get('v');
-      } else if (url.hostname === 'youtu.be') {
-        videoId = url.pathname.substring(1);
-      }
-      return videoId ? `https://www.youtube.com/embed/${videoId}` : null;
-    } catch (e) {
-      console.error("Invalid video URL for embed:", videoUrl, e);
-      return null;
-    }
-  };
-
-  const videoEmbedUrl = recommendation.howToUseVideoLink ? getYouTubeEmbedUrl(recommendation.howToUseVideoLink) : null;
-
   return (
     <Card className="flex flex-col h-full shadow-lg border border-gray-200" hoverEffect>
       <div className="p-5">
@@ -40,59 +21,14 @@ const AppRecommendationCard: React.FC<AppRecommendationCardProps> = ({ recommend
           <p className="text-gray-600 text-sm">{recommendation.usage}</p>
         </div>
 
-        {(recommendation.howToUseVideoLink || recommendation.howToUseText) && (
+        {recommendation.howToUseText && (
           <div className="mb-4">
             <h4 className="text-md font-semibold text-gray-700 mb-2">{translate('howToUse')}:</h4>
-            {videoEmbedUrl && (
-              <div className="aspect-video mb-2">
-                <iframe
-                  width="100%"
-                  height="100%"
-                  src={videoEmbedUrl}
-                  title={`YouTube video player for ${recommendation.name}`}
-                  frameBorder="0"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                  className="rounded-lg"
-                ></iframe>
-              </div>
-            )}
-            {recommendation.howToUseVideoLink && !videoEmbedUrl && (
-                 <Button 
-                    as="a" 
-                    href={recommendation.howToUseVideoLink} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    variant="link"
-                    size="sm"
-                    className="mb-2 text-sm"
-                    leftIcon={<i className="fas fa-video"></i>}
-                >
-                    {translate('watchVideoGuide')}
-                </Button>
-            )}
-            {recommendation.howToUseText && (
-              <p className="text-gray-600 text-sm whitespace-pre-line bg-gray-50 p-2 rounded">
-                {recommendation.howToUseText}
-              </p>
-            )}
+            <p className="text-gray-600 text-sm whitespace-pre-line bg-gray-50 p-3 rounded-lg border">
+              {recommendation.howToUseText}
+            </p>
           </div>
         )}
-
-        <div className="mb-4">
-            <Button 
-                as="a" 
-                href={recommendation.officialLink} 
-                target="_blank" 
-                rel="noopener noreferrer" 
-                variant="secondary"
-                size="sm"
-                className="w-full"
-                leftIcon={<i className="fas fa-external-link-alt"></i>}
-            >
-                {translate('visitWebsite')} - {recommendation.name}
-            </Button>
-        </div>
         
         {recommendation.benefits && recommendation.benefits.length > 0 && (
           <div className="mb-4">
