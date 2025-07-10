@@ -2,8 +2,8 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { APP_ROUTES, APP_NAME, APP_TAGLINE } from '../constants';
 import { useLanguage } from '../contexts/LanguageContext';
-import HerPathLogo from '../../components/common/HerPathLogo.tsx';
-import Button from '../../components/common/Button.tsx';
+import HerPathLogo from '../components/common/HerPathLogo';
+import Button from '../components/common/Button';
 
 const WelcomeScreen = () => {
   const { translate } = useLanguage();
